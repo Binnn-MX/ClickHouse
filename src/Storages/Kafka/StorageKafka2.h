@@ -154,6 +154,7 @@ private:
     const String group;
     const String client_id;
     const String format_name;
+    const bool reset_offset_earliest;
     const size_t max_rows_per_message;
     const String schema_name;
     const size_t num_consumers; /// total number of consumers

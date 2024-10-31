@@ -280,4 +280,10 @@ IMPLEMENT_SETTING_ENUM(
      {"StochasticSimple", MergeSelectorAlgorithm::STOCHASTIC_SIMPLE},
      {"Trivial", MergeSelectorAlgorithm::TRIVIAL}})
 
+IMPLEMENT_SETTING_ENUM(
+    KafkaAutoOffsetReset,
+    ErrorCodes::BAD_ARGUMENTS,
+    {{"earliest", KafkaAutoOffsetReset::EARLIEST},
+     {"latest", KafkaAutoOffsetReset::LATEST}})
+
 }

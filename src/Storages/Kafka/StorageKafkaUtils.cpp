@@ -77,6 +77,7 @@ namespace KafkaSetting
     extern const KafkaSettingsUInt64 kafka_skip_broken_messages;
     extern const KafkaSettingsBool kafka_thread_per_consumer;
     extern const KafkaSettingsString kafka_topic_list;
+    extern const KafkaSettingsKafkaAutoOffsetReset kafka_auto_offset_reset;
 }
 
 using namespace std::chrono_literals;
@@ -178,6 +179,7 @@ void registerStorageKafka(StorageFactory & factory)
             CHECK_KAFKA_STORAGE_ARGUMENT(15, kafka_handle_error_mode, 0)
             CHECK_KAFKA_STORAGE_ARGUMENT(16, kafka_commit_on_select, 0)
             CHECK_KAFKA_STORAGE_ARGUMENT(17, kafka_max_rows_per_message, 0)
+            CHECK_KAFKA_STORAGE_ARGUMENT(18, kafka_auto_offset_reset, 0)
         }
 
 #undef CHECK_KAFKA_STORAGE_ARGUMENT

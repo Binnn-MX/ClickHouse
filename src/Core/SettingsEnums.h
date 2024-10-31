@@ -361,4 +361,11 @@ DECLARE_SETTING_ENUM(GroupArrayActionWhenLimitReached)
 
 DECLARE_SETTING_ENUM(MergeSelectorAlgorithm)
 
+enum class KafkaAutoOffsetReset
+{
+    EARLIEST,
+    LATEST,
+};
+DECLARE_SETTING_ENUM(KafkaAutoOffsetReset)
+
 }

@@ -43,6 +43,7 @@ namespace ErrorCodes
     DECLARE(UInt64, kafka_max_rows_per_message, 1, "The maximum number of rows produced in one kafka message for row-based formats.", 0) \
     DECLARE(String, kafka_keeper_path, "", "The path to the table in ClickHouse Keeper", 0) \
     DECLARE(String, kafka_replica_name, "", "The replica name in ClickHouse Keeper", 0) \
+    DECLARE(KafkaAutoOffsetReset, kafka_auto_offset_reset, KafkaAutoOffsetReset::EARLIEST, "The default offset reset policy for Kafka engine.", 0) \
 
 #define OBSOLETE_KAFKA_SETTINGS(M, ALIAS) \
     MAKE_OBSOLETE(M, Char, kafka_row_delimiter, '\0') \
