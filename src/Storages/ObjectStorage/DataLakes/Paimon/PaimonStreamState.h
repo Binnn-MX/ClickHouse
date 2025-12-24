@@ -13,9 +13,6 @@
 namespace DB
 {
 
-using namespace Paimon;
-
-
 /// Manages the incremental read state for Paimon tables using ClickHouse Keeper.
 /// This is similar to how Kafka2 stores offsets in Keeper, but for Paimon snapshot IDs.
 ///

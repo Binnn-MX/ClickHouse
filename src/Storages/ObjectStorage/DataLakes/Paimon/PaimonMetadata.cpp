@@ -102,7 +102,7 @@ DataLakeMetadataPtr PaimonMetadata::create(
     const auto & data_lake_settings = configuration_ptr->getDataLakeSettings();
     /// Incremental read / Keeper persistence is disabled for this stage
     bool incremental_read_enabled = false;
-    Int64 metadata_refresh_interval_ms = data_lake_settings ? (*data_lake_settings)[DataLakeSetting::paimon_metadata_refresh_interval_ms].value : 0;
+    Int64 metadata_refresh_interval_ms = data_lake_settings[DataLakeSetting::paimon_metadata_refresh_interval_ms].value;
     PaimonStreamStatePtr stream_state = nullptr;
 
     /// Create persistent components
@@ -393,7 +393,7 @@ void PaimonMetadata::scheduleBackgroundRefresh()
 
     auto schedule_pool = getContext()->getSchedulePool();
     refresh_task = schedule_pool.createTask(
-        "PaimonMetadataRefresh/" + persistent_components.table_path,
+        StorageID::createEmpty(), "PaimonMetadataRefresh/" + persistent_components.table_path,
         [this]()
         {
             runBackgroundRefresh();

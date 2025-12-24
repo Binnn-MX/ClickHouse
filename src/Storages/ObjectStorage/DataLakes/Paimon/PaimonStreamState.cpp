@@ -19,9 +19,6 @@ extern const int REPLICA_IS_ALREADY_ACTIVE;
 
 namespace fs = std::filesystem;
 
-using namespace Paimon;
-
-
 PaimonStreamState::PaimonStreamState(
     zkutil::ZooKeeperPtr keeper_,
     const String & keeper_path_,
