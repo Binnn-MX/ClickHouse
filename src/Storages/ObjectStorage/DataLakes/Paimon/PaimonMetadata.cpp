@@ -49,6 +49,13 @@ namespace Setting
 extern const SettingsBool use_paimon_partition_pruning;
 }
 
+namespace DataLakeStorageSetting
+{
+extern const DataLakeStorageSettingsBool paimon_incremental_read;
+extern const DataLakeStorageSettingsString paimon_replica_name;
+extern const DataLakeStorageSettingsInt64 paimon_metadata_refresh_interval_ms;
+}
+
 DataLakeMetadataPtr PaimonMetadata::create(
     const ObjectStoragePtr & object_storage,
     const StorageObjectStorageConfigurationWeakPtr & configuration,
