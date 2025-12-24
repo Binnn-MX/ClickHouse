@@ -11,9 +11,6 @@
 namespace DB
 {
 
-using namespace Paimon;
-
-
 /// Immutable table state snapshot for Paimon.
 /// Once created, it should never be modified.
 /// Used for snapshot isolation and lock-free reads.

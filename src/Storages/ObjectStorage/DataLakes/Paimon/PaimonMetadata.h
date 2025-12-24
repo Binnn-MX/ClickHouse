@@ -14,6 +14,7 @@
 #include <Storages/ObjectStorage/DataLakes/Paimon/PaimonTableState.h>
 #include <Storages/ObjectStorage/DataLakes/Paimon/PaimonPersistentComponents.h>
 #include <Storages/ObjectStorage/DataLakes/Paimon/PaimonClient.h>
+#include <Storages/ObjectStorage/DataLakes/Paimon/PartitionPruner.h>
 #include <Storages/ObjectStorage/StorageObjectStorage.h>
 #include <Core/BackgroundSchedulePool.h>
 #include <Poco/JSON/Array.h>
@@ -142,8 +143,8 @@ private:
     // ==================== Member Variables ====================
 
     /// Atomic pointer for current table state (COW pattern)
-    /// Using shared_ptr for atomic operations
-    mutable std::atomic<std::shared_ptr<const PaimonTableState>> current_state{nullptr};
+    /// Using shared_ptr with atomic_load/atomic_store to avoid atomic<shared_ptr> requirement
+    mutable std::shared_ptr<const PaimonTableState> current_state{nullptr};
 
     /// Update mutex: only held briefly during state replacement
     mutable std::mutex update_mutex;

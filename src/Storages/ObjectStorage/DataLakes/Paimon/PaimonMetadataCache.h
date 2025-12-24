@@ -129,7 +129,7 @@ public:
     }
 
     /// Check if a key exists in cache.
-    bool contains(const String & key) const { return Base::get(key) != nullptr; }
+    bool contains(const String & key) const { return Base::contains(key); }
 
     /// Remove a key from cache.
     void remove(const String & key) { Base::remove(key); }

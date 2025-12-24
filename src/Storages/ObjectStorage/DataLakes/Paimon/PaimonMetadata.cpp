@@ -140,7 +140,7 @@ PaimonMetadata::PaimonMetadata(
 
     /// Load initial state
     auto initial_state = loadLatestState();
-    current_state.store(initial_state, std::memory_order_release);
+    std::atomic_store_explicit(&current_state, initial_state, std::memory_order_release);
 
     LOG_DEBUG(log, "PaimonMetadata initialized with snapshot_id={}, schema_id={}",
               initial_state->snapshot_id, initial_state->schema_id);
@@ -169,7 +169,7 @@ void PaimonMetadata::checkSupportedConfiguration() const
 
 PaimonTableStatePtr PaimonMetadata::getCurrentState() const
 {
-    return current_state.load(std::memory_order_acquire);
+    return std::atomic_load_explicit(&current_state, std::memory_order_acquire);
 }
 
 PaimonTableStatePtr PaimonMetadata::loadLatestState() const
@@ -219,7 +219,7 @@ void PaimonMetadata::update(const ContextPtr & /*local_context*/)
     /// 3. Atomically replace state (very short critical section)
 {
         std::lock_guard lock(update_mutex);
-        current_state.store(new_state, std::memory_order_release);
+        std::atomic_store_explicit(&current_state, new_state, std::memory_order_release);
     }
 
     LOG_DEBUG(
