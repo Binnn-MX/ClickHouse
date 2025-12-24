@@ -82,7 +82,7 @@ public:
         FileProgressCallback callback,
         size_t list_batch_size,
         StorageMetadataPtr storage_metadata,
-        ContextPtr context) const override;
+        ContextPtr query_context) const override;
 
     // ==================== Incremental Read Support ====================
 

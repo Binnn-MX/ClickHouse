@@ -331,7 +331,7 @@ ObjectIterator PaimonMetadata::iterate(
     FileProgressCallback callback,
     size_t /* list_batch_size */,
     StorageMetadataPtr storage_metadata,
-    ContextPtr context) const
+    ContextPtr query_context) const
 {
     /// 1. Try to extract state from storage_metadata for snapshot isolation
     auto state = extractTableState(storage_metadata);
@@ -351,7 +351,7 @@ ObjectIterator PaimonMetadata::iterate(
 
     /// 3. Build partition pruner if needed
     std::optional<PartitionPruner> partition_pruner;
-    if (filter_dag && context->getSettingsRef()[Setting::use_paimon_partition_pruning])
+    if (filter_dag && query_context->getSettingsRef()[Setting::use_paimon_partition_pruning])
     {
         auto filter_dag_copy = filter_dag->clone();
         partition_pruner.emplace(*schema, filter_dag_copy, getContext());
@@ -383,6 +383,7 @@ std::optional<Int64> PaimonMetadata::getCommittedSnapshotId() const
 
 void PaimonMetadata::commitSnapshot(Int64 snapshot_id)
 {
+    (void)snapshot_id;
     LOG_WARNING(log, "commitSnapshot called but incremental read is disabled at this stage");
 }
 
@@ -391,7 +392,7 @@ void PaimonMetadata::scheduleBackgroundRefresh()
     if (refresh_interval_ms.count() == 0)
         return;
 
-    auto schedule_pool = getContext()->getSchedulePool();
+    auto & schedule_pool = getContext()->getSchedulePool();
     refresh_task = schedule_pool.createTask(
         StorageID::createEmpty(), "PaimonMetadataRefresh/" + persistent_components.table_path,
         [this]()

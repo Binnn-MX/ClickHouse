@@ -14,9 +14,6 @@
 namespace DB
 {
 
-using namespace Paimon;
-
-
 /// Thread-safe schema processor for Paimon.
 /// Caches parsed schemas and their ClickHouse type mappings.
 /// Similar to IcebergSchemaProcessor in design.

@@ -14,8 +14,6 @@ extern const int LOGICAL_ERROR;
 extern const int BAD_ARGUMENTS;
 }
 
-using namespace Paimon;
-
 
 PaimonTableSchemaPtr PaimonSchemaProcessor::addSchema(const Poco::JSON::Object::Ptr & schema_json)
 {
