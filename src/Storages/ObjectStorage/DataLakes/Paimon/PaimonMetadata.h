@@ -35,7 +35,7 @@ public:
         ObjectStoragePtr object_storage_,
         StorageObjectStorageConfigurationPtr configuration_,
         const DB::ContextPtr & context_,
-        Paimon::PaimonPersistentComponents persistent_components_,
+        PaimonPersistentComponents persistent_components_,
         PaimonTableClientPtr table_client_);
 
     static DataLakeMetadataPtr create(

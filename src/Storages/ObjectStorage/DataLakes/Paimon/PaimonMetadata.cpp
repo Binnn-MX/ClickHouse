@@ -167,12 +167,12 @@ void PaimonMetadata::checkSupportedConfiguration() const
     }
 }
 
-Paimon::PaimonTableStatePtr PaimonMetadata::getCurrentState() const
+PaimonTableStatePtr PaimonMetadata::getCurrentState() const
 {
     return current_state.load(std::memory_order_acquire);
 }
 
-Paimon::PaimonTableStatePtr PaimonMetadata::loadLatestState() const
+PaimonTableStatePtr PaimonMetadata::loadLatestState() const
 {
     /// All I/O operations happen here, outside any lock
 
@@ -191,7 +191,7 @@ Paimon::PaimonTableStatePtr PaimonMetadata::loadLatestState() const
     /// Register snapshot-schema relationship
     persistent_components.schema_processor->registerSnapshotSchema(snapshot.id, snapshot.schema_id);
 
-    return std::make_shared<Paimon::PaimonTableState>(
+    return std::make_shared<PaimonTableState>(
         snapshot.id,
         snapshot.schema_id,
         snapshot.base_manifest_list,
@@ -278,7 +278,7 @@ bool PaimonMetadata::operator==(const IDataLakeMetadata & other) const
     return *this_state == *other_state;
 }
 
-Paimon::PaimonTableStatePtr PaimonMetadata::extractTableState(StorageMetadataPtr /*storage_metadata*/)
+PaimonTableStatePtr PaimonMetadata::extractTableState(StorageMetadataPtr /*storage_metadata*/)
 {
     /// TODO: Extract PaimonTableState from storage_metadata.datalake_table_state
     /// For now, return nullptr to fall back to current state
@@ -427,7 +427,7 @@ void PaimonMetadata::runBackgroundRefresh()
     refresh_task->scheduleAfter(refresh_interval_ms.count());
 }
 
-Paimon::PaimonTableStatePtr PaimonMetadata::loadStateForSnapshot(Int64 snapshot_id) const
+PaimonTableStatePtr PaimonMetadata::loadStateForSnapshot(Int64 snapshot_id) const
 {
     /// Get snapshot by ID
     auto snapshot = table_client->getSnapshot({snapshot_id, ""});
@@ -440,7 +440,7 @@ Paimon::PaimonTableStatePtr PaimonMetadata::loadStateForSnapshot(Int64 snapshot_
         persistent_components.schema_processor->addSchema(schema_json);
     }
 
-    return std::make_shared<Paimon::PaimonTableState>(
+    return std::make_shared<PaimonTableState>(
         snapshot.id,
         snapshot.schema_id,
         snapshot.base_manifest_list,
@@ -452,10 +452,10 @@ Paimon::PaimonTableStatePtr PaimonMetadata::loadStateForSnapshot(Int64 snapshot_
         snapshot.watermark);
 }
 
-std::vector<Paimon::PaimonTableStatePtr> PaimonMetadata::getSnapshotsBetween(
+std::vector<PaimonTableStatePtr> PaimonMetadata::getSnapshotsBetween(
     Int64 from_snapshot_id, Int64 to_snapshot_id) const
 {
-    std::vector<Paimon::PaimonTableStatePtr> snapshots;
+    std::vector<PaimonTableStatePtr> snapshots;
 
     /// For simplicity, we only return the latest snapshot state
     /// In a full implementation, we would iterate through all snapshots between from and to
@@ -480,7 +480,7 @@ std::vector<Paimon::PaimonTableStatePtr> PaimonMetadata::getSnapshotsBetween(
 }
 
 Strings PaimonMetadata::collectIncrementalDataFiles(
-    const Paimon::PaimonTableStatePtr & state,
+    const PaimonTableStatePtr & state,
     const std::optional<PartitionPruner> & partition_pruner) const
 {
     Strings data_files;
@@ -568,7 +568,7 @@ Strings PaimonMetadata::collectIncrementalDataFiles(
 }
 
 Strings PaimonMetadata::collectDeltaFilesForSnapshot(
-    const Paimon::PaimonTableStatePtr & state,
+    const PaimonTableStatePtr & state,
     const std::optional<PartitionPruner> & partition_pruner) const
 {
     Strings data_files;
@@ -597,7 +597,7 @@ Strings PaimonMetadata::collectDeltaFilesForSnapshot(
 }
 
 Strings PaimonMetadata::collectFullScanDataFiles(
-    const Paimon::PaimonTableStatePtr & state,
+    const PaimonTableStatePtr & state,
     const std::optional<PartitionPruner> & partition_pruner) const
 {
     Strings data_files;
