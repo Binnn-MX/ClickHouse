@@ -14,8 +14,8 @@ extern const int LOGICAL_ERROR;
 extern const int BAD_ARGUMENTS;
 }
 
-namespace Paimon
-{
+using namespace Paimon;
+
 
 PaimonTableSchemaPtr PaimonSchemaProcessor::addSchema(const Poco::JSON::Object::Ptr & schema_json)
 {
@@ -161,7 +161,6 @@ std::shared_ptr<NamesAndTypesList> PaimonSchemaProcessor::convertToClickHouseSch
 
 }
 
-}
 
 #endif
 

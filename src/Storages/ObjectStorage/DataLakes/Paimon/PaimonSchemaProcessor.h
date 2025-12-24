@@ -14,8 +14,8 @@
 namespace DB
 {
 
-namespace Paimon
-{
+using namespace Paimon;
+
 
 /// Thread-safe schema processor for Paimon.
 /// Caches parsed schemas and their ClickHouse type mappings.
@@ -85,7 +85,6 @@ using PaimonSchemaProcessorPtr = std::shared_ptr<PaimonSchemaProcessor>;
 
 }
 
-}
 
 #endif
 

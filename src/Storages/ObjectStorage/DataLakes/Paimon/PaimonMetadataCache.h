@@ -26,8 +26,8 @@ extern const Metric PaimonMetadataCacheFiles;
 namespace DB
 {
 
-namespace Paimon
-{
+using namespace Paimon;
+
 
 /// Cache cell that can hold different types of Paimon metadata
 struct PaimonMetadataCacheCell
@@ -139,8 +139,6 @@ public:
 };
 
 using PaimonMetadataCachePtr = std::shared_ptr<PaimonMetadataCache>;
-
-}
 
 }
 

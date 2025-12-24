@@ -19,8 +19,8 @@ extern const int REPLICA_IS_ALREADY_ACTIVE;
 
 namespace fs = std::filesystem;
 
-namespace Paimon
-{
+using namespace Paimon;
+
 
 PaimonStreamState::PaimonStreamState(
     zkutil::ZooKeeperPtr keeper_,
@@ -231,7 +231,6 @@ void PaimonStreamState::removeProcessingLock()
 
 }
 
-}
 
 #endif
 

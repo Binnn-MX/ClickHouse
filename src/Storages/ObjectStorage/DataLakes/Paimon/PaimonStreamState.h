@@ -13,8 +13,8 @@
 namespace DB
 {
 
-namespace Paimon
-{
+using namespace Paimon;
+
 
 /// Manages the incremental read state for Paimon tables using ClickHouse Keeper.
 /// This is similar to how Kafka2 stores offsets in Keeper, but for Paimon snapshot IDs.
@@ -108,8 +108,6 @@ private:
 };
 
 using PaimonStreamStatePtr = std::shared_ptr<PaimonStreamState>;
-
-}
 
 }
 

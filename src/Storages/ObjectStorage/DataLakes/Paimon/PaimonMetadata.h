@@ -24,6 +24,8 @@
 namespace DB
 {
 
+using namespace Paimon;
+
 class PaimonMetadata : public IDataLakeMetadata, private WithContext
 {
 public:
@@ -95,19 +97,19 @@ public:
 
 private:
     /// Lock-free read of current state
-    Paimon::PaimonTableStatePtr getCurrentState() const;
+    PaimonTableStatePtr getCurrentState() const;
 
     /// Load latest state from object storage (I/O outside of any lock)
-    Paimon::PaimonTableStatePtr loadLatestState() const;
+    PaimonTableStatePtr loadLatestState() const;
 
     /// Load state for a specific snapshot ID
-    Paimon::PaimonTableStatePtr loadStateForSnapshot(Int64 snapshot_id) const;
+    PaimonTableStatePtr loadStateForSnapshot(Int64 snapshot_id) const;
 
     /// Get all snapshots between from_snapshot (exclusive) and to_snapshot (inclusive)
-    std::vector<Paimon::PaimonTableStatePtr> getSnapshotsBetween(Int64 from_snapshot_id, Int64 to_snapshot_id) const;
+    std::vector<PaimonTableStatePtr> getSnapshotsBetween(Int64 from_snapshot_id, Int64 to_snapshot_id) const;
 
     /// Extract table state from storage_metadata
-    static Paimon::PaimonTableStatePtr extractTableState(StorageMetadataPtr storage_metadata);
+    static PaimonTableStatePtr extractTableState(StorageMetadataPtr storage_metadata);
 
     /// Get or load manifest file list (uses cache)
     std::vector<PaimonManifestFileMeta> getManifestList(const String & manifest_list_path) const;
@@ -120,17 +122,17 @@ private:
 
     /// Collect data files for incremental read (from committed snapshot to current)
     Strings collectIncrementalDataFiles(
-        const Paimon::PaimonTableStatePtr & state,
+        const PaimonTableStatePtr & state,
         const std::optional<PartitionPruner> & partition_pruner) const;
 
     /// Collect data files for a specific snapshot delta (session-level targeted read)
     Strings collectDeltaFilesForSnapshot(
-        const Paimon::PaimonTableStatePtr & state,
+        const PaimonTableStatePtr & state,
         const std::optional<PartitionPruner> & partition_pruner) const;
 
     /// Collect data files for full scan
     Strings collectFullScanDataFiles(
-        const Paimon::PaimonTableStatePtr & state,
+        const PaimonTableStatePtr & state,
         const std::optional<PartitionPruner> & partition_pruner) const;
 
     /// Background refresh task entry
@@ -141,13 +143,13 @@ private:
 
     /// Atomic pointer for current table state (COW pattern)
     /// Using shared_ptr for atomic operations
-    mutable std::atomic<std::shared_ptr<const Paimon::PaimonTableState>> current_state{nullptr};
+    mutable std::atomic<std::shared_ptr<const PaimonTableState>> current_state{nullptr};
 
     /// Update mutex: only held briefly during state replacement
     mutable std::mutex update_mutex;
 
     /// Persistent components: thread-safe or immutable
-    Paimon::PaimonPersistentComponents persistent_components;
+    PaimonPersistentComponents persistent_components;
 
     /// I/O client (stateless operations)
     PaimonTableClientPtr table_client;
@@ -160,7 +162,7 @@ private:
     constexpr static String PARTITION_DEFAULT_VALUE = "__DEFAULT_PARTITION__";
 
     /// Background refresh
-    BackgroundSchedulePool::TaskHolderPtr refresh_task;
+    BackgroundSchedulePoolTaskHolder refresh_task;
     const std::chrono::milliseconds refresh_interval_ms{0};
     std::atomic_bool refresh_in_progress{false};
 };

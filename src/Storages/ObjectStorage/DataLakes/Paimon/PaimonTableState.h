@@ -11,8 +11,8 @@
 namespace DB
 {
 
-namespace Paimon
-{
+using namespace Paimon;
+
 
 /// Immutable table state snapshot for Paimon.
 /// Once created, it should never be modified.
@@ -63,10 +63,8 @@ struct PaimonTableState
 
 using PaimonTableStatePtr = std::shared_ptr<const PaimonTableState>;
 
-}
-
 /// Type alias for DataLake table state variant
-using PaimonTableStateSnapshot = Paimon::PaimonTableState;
+using PaimonTableStateSnapshot = PaimonTableState;
 
 }
 
