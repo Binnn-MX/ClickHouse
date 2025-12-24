@@ -49,13 +49,6 @@ namespace Setting
 extern const SettingsBool use_paimon_partition_pruning;
 }
 
-namespace DataLakeSetting
-{
-extern const DataLakeStorageSettingsBool paimon_incremental_read;
-extern const DataLakeStorageSettingsString paimon_replica_name;
-extern const DataLakeStorageSettingsInt64 paimon_metadata_refresh_interval_ms;
-}
-
 DataLakeMetadataPtr PaimonMetadata::create(
     const ObjectStoragePtr & object_storage,
     const StorageObjectStorageConfigurationWeakPtr & configuration,
@@ -102,7 +95,7 @@ DataLakeMetadataPtr PaimonMetadata::create(
     const auto & data_lake_settings = configuration_ptr->getDataLakeSettings();
     /// Incremental read / Keeper persistence is disabled for this stage
     bool incremental_read_enabled = false;
-    Int64 metadata_refresh_interval_ms = data_lake_settings[DataLakeSetting::paimon_metadata_refresh_interval_ms].value;
+    Int64 metadata_refresh_interval_ms = data_lake_settings[DataLakeStorageSetting::paimon_metadata_refresh_interval_ms].value;
     PaimonStreamStatePtr stream_state = nullptr;
 
     /// Create persistent components
