@@ -43,6 +43,9 @@ struct PaimonPersistentComponents
     /// Whether incremental read is enabled
     const bool incremental_read_enabled;
 
+    /// Target snapshot id for compensation read (<=0 means disabled)
+    const Int64 target_snapshot_id;
+
     /// Background metadata refresh interval (ms). 0 means disabled.
     const Int64 metadata_refresh_interval_ms;
 
@@ -54,6 +57,7 @@ struct PaimonPersistentComponents
         String table_path_,
         String partition_default_name_ = "__DEFAULT_PARTITION__",
         bool incremental_read_enabled_ = false,
+        Int64 target_snapshot_id_ = -1,
         Int64 metadata_refresh_interval_ms_ = 0)
         : schema_processor(std::move(schema_processor_))
         , metadata_cache(std::move(metadata_cache_))
@@ -62,6 +66,7 @@ struct PaimonPersistentComponents
         , table_path(std::move(table_path_))
         , partition_default_name(std::move(partition_default_name_))
         , incremental_read_enabled(incremental_read_enabled_)
+        , target_snapshot_id(target_snapshot_id_)
         , metadata_refresh_interval_ms(metadata_refresh_interval_ms_)
     {
     }

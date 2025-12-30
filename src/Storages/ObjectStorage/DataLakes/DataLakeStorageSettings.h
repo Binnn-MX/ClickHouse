@@ -64,7 +64,6 @@ Metadata format version.
     DECLARE(Bool, paimon_incremental_read, false, R"(
 Enable incremental read mode for Paimon tables. When enabled, the table will track the last committed snapshot
 in Keeper and only read new data since that snapshot. This is similar to Kafka streaming consumption.
-Requires paimon_keeper_path to be set.
 )", 0) \
     DECLARE(Int64, paimon_target_snapshot_id, -1, R"(
 Session-level targeted snapshot read for Paimon incremental mode. When >0, the reader will only fetch the delta
@@ -77,10 +76,6 @@ Background metadata refresh interval for Paimon tables (milliseconds).
 metadata update to pull latest snapshot/schema. Queries still trigger update
 as usual. Use cautiously on many tables to avoid excessive object storage/Keeper I/O.
 Default: 0 (disabled)
-)", 0) \
-    DECLARE(String, paimon_replica_name, "{replica}", R"(
-Replica name for Paimon incremental read. Used to identify this replica in Keeper.
-Supports macros like {replica}. Default: {replica}
 )", 0) \
     DECLARE(DatabaseDataLakeCatalogType, storage_catalog_type, DatabaseDataLakeCatalogType::NONE, "Catalog type", 0) \
     DECLARE(String, storage_catalog_credential, "", "", 0)             \

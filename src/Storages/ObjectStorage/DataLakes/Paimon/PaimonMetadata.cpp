@@ -24,6 +24,9 @@
 #include <Storages/ObjectStorage/IObjectIterator.h>
 #include <Storages/ObjectStorage/StorageObjectStorageSettings.h>
 #include <Storages/ObjectStorage/StorageObjectStorageSource.h>
+#include <Common/ScopeGuard.h>
+#include <Common/FQDN.h>
+#include <Common/UUIDHelpers.h>
 #include <base/defines.h>
 #include <Common/Exception.h>
 #include <Common/Macros.h>
@@ -100,10 +103,34 @@ DataLakeMetadataPtr PaimonMetadata::create(
 
     /// Check if incremental read is enabled
     const auto & data_lake_settings = configuration_ptr->getDataLakeSettings();
-    /// Incremental read / Keeper persistence is disabled for this stage
-    bool incremental_read_enabled = false;
+    bool incremental_read_enabled = data_lake_settings[DataLakeStorageSetting::paimon_incremental_read].value;
     Int64 metadata_refresh_interval_ms = data_lake_settings[DataLakeStorageSetting::paimon_metadata_refresh_interval_ms].value;
+    Int64 target_snapshot_id = data_lake_settings[DataLakeStorageSetting::paimon_target_snapshot_id].value;
     PaimonStreamStatePtr stream_state = nullptr;
+
+    if (incremental_read_enabled)
+    {
+        if (!local_context->hasZooKeeper())
+            throw Exception(ErrorCodes::NO_ZOOKEEPER, "Incremental read requires Keeper but ZooKeeper is not configured");
+
+        /// Build keeper path automatically: /clickhouse/paimon/<table_path>
+        /// table_path already unique per storage definition
+        String keeper_path = "/clickhouse/paimon";
+        if (!keeper_path.ends_with('/'))
+            keeper_path += '/';
+        keeper_path += table_path;
+
+        /// Use host-based unique replica name to avoid config knob
+        String host = getFQDNOrHostName();
+        String replica_name = fmt::format("paimon-{}-{}", host, UUIDHelpers::UUIDToString(UUIDHelpers::generateV4()));
+
+        auto keeper = local_context->getZooKeeper();
+        auto stream_log = getLogger("PaimonStreamState");
+        stream_state = std::make_shared<PaimonStreamState>(keeper, keeper_path, replica_name, stream_log);
+        stream_state->initializeKeeperNodes();
+        if (!stream_state->activate())
+            LOG_WARNING(stream_log, "Replica {} not activated for Paimon incremental read (maybe already active elsewhere)", replica_name);
+    }
 
     /// Create persistent components
     PaimonPersistentComponents persistent_components(
@@ -114,6 +141,7 @@ DataLakeMetadataPtr PaimonMetadata::create(
         table_path,
         partition_default_name,
         incremental_read_enabled,
+        target_snapshot_id,
         metadata_refresh_interval_ms);
 
     return std::make_unique<PaimonMetadata>(
@@ -360,8 +388,43 @@ ObjectIterator PaimonMetadata::iterate(
     /// 4. Collect data files based on read mode
     Strings data_files;
 
-    /// Incremental read is disabled in this stage; always do full scan
-    data_files = collectFullScanDataFiles(state, partition_pruner);
+    /// 4.a Session-level targeted snapshot (only when incremental is enabled)
+    if (persistent_components.incremental_read_enabled && target_snapshot_id > 0)
+    {
+        auto target_state = loadStateForSnapshot(target_snapshot_id);
+        data_files = collectDeltaFilesForSnapshot(target_state, partition_pruner);
+    }
+    /// 4.b Regular incremental mode
+    else if (isIncrementalReadEnabled())
+    {
+        auto stream_state = persistent_components.stream_state;
+        if (stream_state->needsNewKeeper())
+        {
+            auto keeper = getContext()->getZooKeeper();
+            stream_state->setKeeper(keeper);
+            stream_state->initializeKeeperNodes();
+            stream_state->activate();
+        }
+
+        bool lock_acquired = false;
+        SCOPE_EXIT(
+        {
+            if (lock_acquired)
+                stream_state->releaseProcessingLock();
+        });
+
+        stream_state->acquireProcessingLock();
+        lock_acquired = true;
+
+        data_files = collectIncrementalDataFiles(state, partition_pruner);
+
+        if (!data_files.empty())
+            stream_state->setCommittedSnapshot(state->snapshot_id);
+    }
+    else
+    {
+        data_files = collectFullScanDataFiles(state, partition_pruner);
+    }
 
     LOG_DEBUG(log, "Collected {} data files for snapshot_id={} (incremental={})",
               data_files.size(), state->snapshot_id, isIncrementalReadEnabled());
@@ -373,18 +436,24 @@ ObjectIterator PaimonMetadata::iterate(
 
 bool PaimonMetadata::isIncrementalReadEnabled() const
 {
-    return false;
+    return persistent_components.hasStreamState();
 }
 
 std::optional<Int64> PaimonMetadata::getCommittedSnapshotId() const
-        {
-    return std::nullopt;
-    }
+{
+    if (!persistent_components.hasStreamState())
+        return std::nullopt;
+    return persistent_components.stream_state->getCommittedSnapshotId();
+}
 
 void PaimonMetadata::commitSnapshot(Int64 snapshot_id)
 {
-    (void)snapshot_id;
-    LOG_WARNING(log, "commitSnapshot called but incremental read is disabled at this stage");
+    if (!persistent_components.hasStreamState())
+    {
+        LOG_WARNING(log, "commitSnapshot called but incremental read is disabled");
+        return;
+    }
+    persistent_components.stream_state->setCommittedSnapshot(snapshot_id);
 }
 
 void PaimonMetadata::scheduleBackgroundRefresh()
