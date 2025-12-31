@@ -24,7 +24,7 @@
 #include <Storages/ObjectStorage/IObjectIterator.h>
 #include <Storages/ObjectStorage/StorageObjectStorageSettings.h>
 #include <Storages/ObjectStorage/StorageObjectStorageSource.h>
-#include <Common/ScopeGuard.h>
+#include <base/scope_guard.h>
 #include <Common/FQDN.h>
 #include <Common/UUIDHelpers.h>
 #include <base/defines.h>
@@ -55,8 +55,8 @@ extern const SettingsBool use_paimon_partition_pruning;
 namespace DataLakeStorageSetting
 {
 extern const DataLakeStorageSettingsBool paimon_incremental_read;
-extern const DataLakeStorageSettingsString paimon_replica_name;
 extern const DataLakeStorageSettingsInt64 paimon_metadata_refresh_interval_ms;
+extern const DataLakeStorageSettingsInt64 paimon_target_snapshot_id;
 }
 
 DataLakeMetadataPtr PaimonMetadata::create(
