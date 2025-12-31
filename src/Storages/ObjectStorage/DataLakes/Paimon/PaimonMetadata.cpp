@@ -113,7 +113,7 @@ DataLakeMetadataPtr PaimonMetadata::create(
         if (!local_context->hasZooKeeper())
             throw Exception(ErrorCodes::NO_ZOOKEEPER, "Incremental read requires Keeper but ZooKeeper is not configured");
 
-        /// Build keeper path automatically: /clickhouse/paimon/<table_path>
+        /// Build keeper path automatically: /clickhouse/paimon/{table_path}
         /// table_path already unique per storage definition
         String keeper_path = "/clickhouse/paimon";
         if (!keeper_path.ends_with('/'))
@@ -389,9 +389,9 @@ ObjectIterator PaimonMetadata::iterate(
     Strings data_files;
 
     /// 4.a Session-level targeted snapshot (only when incremental is enabled)
-    if (persistent_components.incremental_read_enabled && target_snapshot_id > 0)
+    if (persistent_components.incremental_read_enabled && persistent_components.target_snapshot_id > 0)
     {
-        auto target_state = loadStateForSnapshot(target_snapshot_id);
+        auto target_state = loadStateForSnapshot(persistent_components.target_snapshot_id);
         data_files = collectDeltaFilesForSnapshot(target_state, partition_pruner);
     }
     /// 4.b Regular incremental mode
