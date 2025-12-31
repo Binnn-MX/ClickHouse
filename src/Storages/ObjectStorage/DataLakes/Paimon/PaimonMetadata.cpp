@@ -25,7 +25,7 @@
 #include <Storages/ObjectStorage/StorageObjectStorageSettings.h>
 #include <Storages/ObjectStorage/StorageObjectStorageSource.h>
 #include <base/scope_guard.h>
-#include <Common/getFQDNOrHostName.h>
+#include <Common/FQDNOrHostName.h>
 #include <Common/UUIDHelpers.h>
 #include <base/defines.h>
 #include <Common/Exception.h>
