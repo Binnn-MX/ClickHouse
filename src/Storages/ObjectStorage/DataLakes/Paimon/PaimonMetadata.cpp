@@ -26,7 +26,7 @@
 #include <Storages/ObjectStorage/StorageObjectStorageSource.h>
 #include <base/scope_guard.h>
 #include <base/getFQDNOrHostName.h>
-#include <Common/UUIDHelpers.h>
+#include <Core/UUID.h>
 #include <base/defines.h>
 #include <Common/Exception.h>
 #include <Common/Macros.h>
@@ -122,7 +122,7 @@ DataLakeMetadataPtr PaimonMetadata::create(
 
         /// Use host-based unique replica name to avoid config knob
         String host = getFQDNOrHostName();
-        String replica_name = fmt::format("paimon-{}-{}", host, UUIDHelpers::UUIDToString(UUIDHelpers::generateV4()));
+        String replica_name = fmt::format("paimon-{}-{}", host, toString(UUIDHelpers::generateV4()));
 
         auto keeper = local_context->getZooKeeper();
         auto stream_log = getLogger("PaimonStreamState");
