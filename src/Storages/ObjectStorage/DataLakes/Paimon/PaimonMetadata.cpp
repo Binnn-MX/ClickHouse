@@ -11,12 +11,13 @@
 #include <utility>
 #include <vector>
 #include <Core/NamesAndTypes.h>
-#include <Core/Types.h>
 #include <Core/Settings.h>
 #include <Disks/IStoragePolicy.h>
 #include <IO/ReadHelpers.h>
 #include <IO/WriteHelpers.h>
 #include <Interpreters/Context.h>
+#include <Storages/ObjectStorage/DataLakes/Constant.h>
+#include <Storages/ObjectStorage/DataLakes/DataLakeStorageSettings.h>
 #include <Storages/ObjectStorage/DataLakes/Paimon/Constant.h>
 #include <Storages/ObjectStorage/DataLakes/Paimon/PaimonClient.h>
 #include <Storages/ObjectStorage/DataLakes/Paimon/PaimonMetadata.h>
@@ -26,16 +27,9 @@
 #include <Storages/ObjectStorage/StorageObjectStorageSettings.h>
 #include <Storages/ObjectStorage/StorageObjectStorageSource.h>
 #include <base/defines.h>
-#include <Common/Exception.h>
-#include <Common/SharedLockGuard.h>
-#include <Storages/ObjectStorage/DataLakes/DataLakeStorageSettings.h>
-#include <Storages/ObjectStorage/IObjectIterator.h>
-#include <Storages/ObjectStorage/StorageObjectStorageSettings.h>
-#include <Storages/ObjectStorage/StorageObjectStorageSource.h>
-#include <base/scope_guard.h>
 #include <base/getFQDNOrHostName.h>
+#include <base/scope_guard.h>
 #include <Core/UUID.h>
-#include <base/defines.h>
 #include <Common/Exception.h>
 #include <Common/Macros.h>
 #include <Common/assert_cast.h>
@@ -213,8 +207,11 @@ PaimonTableStatePtr PaimonMetadata::loadLatestState() const
     /// All I/O operations happen here, outside any lock
 
     /// Get latest snapshot info
-    auto snapshot_info = table_client->getLastestTableSnapshotInfo();
-    auto snapshot = table_client->getSnapshot(snapshot_info);
+    auto snapshot_info_opt = table_client->getLastestTableSnapshotInfo();
+    if (!snapshot_info_opt)
+        throw Exception(ErrorCodes::LOGICAL_ERROR, "Paimon table has no snapshots");
+
+    auto snapshot = table_client->getSnapshot(*snapshot_info_opt);
 
     /// Ensure schema for this snapshot is cached in processor (use schema_id, not "latest")
     if (!persistent_components.schema_processor->hasSchema(snapshot.schema_id))
