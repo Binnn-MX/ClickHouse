@@ -16,7 +16,6 @@
 #include <IO/ReadHelpers.h>
 #include <IO/WriteHelpers.h>
 #include <Interpreters/Context.h>
-#include <Storages/ObjectStorage/DataLakes/Constant.h>
 #include <Storages/ObjectStorage/DataLakes/DataLakeStorageSettings.h>
 #include <Storages/ObjectStorage/DataLakes/Paimon/Constant.h>
 #include <Storages/ObjectStorage/DataLakes/Paimon/PaimonClient.h>
