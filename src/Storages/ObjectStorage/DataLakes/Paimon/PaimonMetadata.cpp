@@ -117,7 +117,7 @@ DataLakeMetadataPtr PaimonMetadata::create(
             throw Exception(ErrorCodes::NO_ZOOKEEPER, "Incremental read requires Keeper but ZooKeeper is not configured");
 
         /// Build keeper path aligned with ClickHouse table paths:
-        /// /clickhouse/tables/<table_uuid>/<sanitized_paimon_table_path>
+        /// /clickhouse/tables/table_uuid/sanitized_paimon_table_path
         String keeper_path = "/clickhouse/tables/";
         keeper_path += configuration_ptr->getStorageID().uuid.toString();
         keeper_path += "/";
