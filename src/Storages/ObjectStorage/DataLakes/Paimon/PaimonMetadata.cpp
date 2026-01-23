@@ -63,7 +63,8 @@ extern const DataLakeStorageSettingsInt64 paimon_target_snapshot_id;
 DataLakeMetadataPtr PaimonMetadata::create(
     const ObjectStoragePtr & object_storage,
     const StorageObjectStorageConfigurationWeakPtr & configuration,
-    const ContextPtr & local_context)
+    const ContextPtr & local_context,
+    std::optional<StorageID> table_id)
 {
     auto configuration_ptr = configuration.lock();
     if (!configuration_ptr)
@@ -119,7 +120,7 @@ DataLakeMetadataPtr PaimonMetadata::create(
         /// Build keeper path aligned with ClickHouse table paths:
         /// /clickhouse/tables/table_uuid/sanitized_paimon_table_path
         String keeper_path = "/clickhouse/tables/";
-        keeper_path += getStorageID().uuid.toString();
+        keeper_path += table_id->uuid.toString();
         keeper_path += "/";
         String sanitized = table_path;
         for (auto & ch : sanitized)
@@ -151,7 +152,8 @@ DataLakeMetadataPtr PaimonMetadata::create(
         partition_default_name,
         incremental_read_enabled,
         target_snapshot_id,
-        metadata_refresh_interval_ms);
+        metadata_refresh_interval_ms,
+        table_id ? std::optional<UUID>(table_id->uuid) : std::nullopt);
 
     return std::make_unique<PaimonMetadata>(
         object_storage, configuration_ptr, global_context, std::move(persistent_components), table_client);
