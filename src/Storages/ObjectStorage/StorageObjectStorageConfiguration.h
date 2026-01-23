@@ -202,7 +202,7 @@ public:
         ObjectStoragePtr object_storage,
         ContextPtr local_context,
         bool if_not_updated_before,
-        std::optional<StorageID> table_id = std::nullopt);
+        std::optional<StorageID> table_id);
 
     virtual void create(
         ObjectStoragePtr object_storage,
