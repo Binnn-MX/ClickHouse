@@ -154,7 +154,8 @@ StorageObjectStorage::StorageObjectStorage(
             configuration->update(
                 object_storage,
                 context,
-                /* if_not_updated_before */ is_table_function);
+                /* if_not_updated_before */ is_table_function,
+                std::nullopt);
             updated_configuration = true;
         }
     }
