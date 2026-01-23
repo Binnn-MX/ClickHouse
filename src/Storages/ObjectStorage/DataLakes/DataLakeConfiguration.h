@@ -90,7 +90,7 @@ public:
         ObjectStoragePtr object_storage,
         ContextPtr local_context,
         bool if_not_updated_before,
-        std::optional<StorageID> table_id = std::nullopt) override
+        std::optional<StorageID> table_id) override
     {
         const bool updated_before = current_metadata != nullptr;
         if (updated_before && if_not_updated_before)
