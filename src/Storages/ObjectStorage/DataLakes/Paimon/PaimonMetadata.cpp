@@ -120,7 +120,7 @@ DataLakeMetadataPtr PaimonMetadata::create(
         /// Build keeper path aligned with ClickHouse table paths:
         /// /clickhouse/tables/table_uuid/sanitized_paimon_table_path
         String keeper_path = "/clickhouse/tables/";
-        keeper_path += table_id->uuid.toString();
+        keeper_path += toString(table_id->uuid);
         keeper_path += "/";
         String sanitized = table_path;
         for (auto & ch : sanitized)
