@@ -15,7 +15,6 @@ import ExperimentalBadge from '@theme/badges/ExperimentalBadge';
 <ExperimentalBadge />
 
 Provides a read-only table-like interface to Apache [Paimon](https://paimon.apache.org/) tables in Amazon S3, Azure, HDFS or locally stored.
-
 ## Syntax {#syntax}
 
 ```sql
