@@ -155,7 +155,7 @@ StorageObjectStorage::StorageObjectStorage(
                 object_storage,
                 context,
                 /* if_not_updated_before */ is_table_function,
-                std::nullopt);
+                storage_id);
             updated_configuration = true;
         }
     }
@@ -322,7 +322,7 @@ IDataLakeMetadata * StorageObjectStorage::getExternalMetadata(ContextPtr query_c
         object_storage,
         query_context,
         /* if_not_updated_before */ false,
-        std::nullopt);
+        storage_id);
 
     return configuration->getExternalMetadata();
 }
@@ -333,7 +333,7 @@ void StorageObjectStorage::updateExternalDynamicMetadataIfExists(ContextPtr quer
         object_storage,
         query_context,
         /* if_not_updated_before */ true,
-        std::nullopt);
+        storage_id);
     if (configuration->needsUpdateForSchemaConsistency())
     {
         auto metadata_snapshot = configuration->getStorageSnapshotMetadata(query_context);
@@ -348,7 +348,7 @@ std::optional<UInt64> StorageObjectStorage::totalRows(ContextPtr query_context) 
         object_storage,
         query_context,
         /* if_not_updated_before */ false,
-        std::nullopt);
+        storage_id);
     return configuration->totalRows(query_context);
 }
 
@@ -358,7 +358,7 @@ std::optional<UInt64> StorageObjectStorage::totalBytes(ContextPtr query_context)
         object_storage,
         query_context,
         /* if_not_updated_before */ false,
-        std::nullopt);
+        storage_id);
     return configuration->totalBytes(query_context);
 }
 
@@ -383,7 +383,7 @@ void StorageObjectStorage::read(
             object_storage,
             local_context,
             /* if_not_updated_before */ false,
-            std::nullopt);
+            storage_id);
     }
 
     if (configuration->partition_strategy && configuration->partition_strategy_type != PartitionStrategyFactory::StrategyType::HIVE)
@@ -489,7 +489,7 @@ SinkToStoragePtr StorageObjectStorage::write(
             object_storage,
             local_context,
             /* if_not_updated_before */ false,
-            std::nullopt);
+            storage_id);
     }
 
     const auto sample_block = std::make_shared<const Block>(metadata_snapshot->getSampleBlock());
