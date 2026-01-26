@@ -33,6 +33,27 @@ paimonHDFSCluster(cluster_name, path_to_table, [,format] [,compression_method])
 - `cluster_name` — Name of a cluster that is used to build a set of addresses and connection parameters to remote and local servers.
 - Description of all other arguments coincides with description of arguments in equivalent [paimon](/sql-reference/table-functions/paimon.md) table function.
 
+## Capabilities {#capabilities}
+
+- Parallel read across cluster nodes with dynamic task distribution.
+- Snapshot reads from the latest table snapshot.
+- Partition pruning when `use_paimon_partition_pruning` is enabled.
+
+## Settings {#settings}
+
+This table function uses the same settings as `paimon` and the corresponding object storage engines. Paimon-specific settings:
+
+- `use_paimon_partition_pruning` — enable partition pruning for Paimon.
+- `paimon_metadata_refresh_interval_ms` — refresh metadata in background.
+- `paimon_keeper_path` — Keeper path for incremental read state. Must be set and unique per table; supports macros such as '/clickhouse/{database}/{uuid}'.
+- `paimon_replica_name` — Replica name for incremental read state. Must be set and unique per replica; supports macros such as `{replica}`.
+
+## Limitations {#limitations}
+
+- Incremental read requires `paimon_keeper_path` to be set and unique per table.
+- `paimon_replica_name` must be unique per replica within the same Keeper path.
+- The table function is read-only; data modification is not supported.
+
 **Returned value**
 
 A table with the specified structure for reading data from cluster in the specified Paimon table.

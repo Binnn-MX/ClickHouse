@@ -1,6 +1,7 @@
 ---
 description: 'Provides a read-only table-like interface to Apache Paimon tables in
-  Amazon S3, Azure, HDFS or locally stored.'
+  Amazon S3, Azure, HDFS or locally stored. This function is also used by the
+  Paimon table engine.'
 sidebar_label: 'paimon'
 sidebar_position: 90
 slug: /sql-reference/table-functions/paimon
@@ -15,6 +16,7 @@ import ExperimentalBadge from '@theme/badges/ExperimentalBadge';
 <ExperimentalBadge />
 
 Provides a read-only table-like interface to Apache [Paimon](https://paimon.apache.org/) tables in Amazon S3, Azure, HDFS or locally stored.
+It supports snapshot reads, incremental reads, and basic partition pruning provided by the engine.
 
 ## Syntax {#syntax}
 
@@ -34,6 +36,31 @@ paimonLocal(path_to_table, [,format] [,compression_method])
 
 Description of the arguments coincides with description of arguments in table functions `s3`, `azureBlobStorage`, `HDFS` and `file` correspondingly.
 `format` stands for the format of data files in the Paimon table.
+
+## Capabilities {#capabilities}
+
+- Snapshot reads from the latest table snapshot.
+- Incremental reads based on committed snapshot id when enabled.
+- Partition pruning when `use_paimon_partition_pruning` is enabled.
+- Optional background refresh of metadata when configured.
+
+## Settings {#settings}
+
+This table function uses the same settings as the corresponding object storage engine and adds Paimon-specific settings:
+
+- `paimon_incremental_read` — enable incremental read mode.
+- `paimon_metadata_refresh_interval_ms` — refresh metadata in background.
+- `paimon_target_snapshot_id` — read a specific snapshot delta (session-level).
+- `paimon_keeper_path` — Keeper path for incremental read state. Must be set and unique per table.
+- `paimon_replica_name` — Replica name for incremental read state. Must be set and unique per replica; supports macros such as `{replica}`.
+- `use_paimon_partition_pruning` — enable partition pruning for Paimon.
+
+## Limitations {#limitations}
+
+- Incremental read requires Keeper (ZooKeeper) to be configured.
+- Incremental read requires `paimon_keeper_path` to be set and unique per table.
+- `paimon_replica_name` must be unique per replica within the same Keeper path.
+- The table function is read-only; data modification is not supported.
 
 ### Returned value {#returned-value}
 
