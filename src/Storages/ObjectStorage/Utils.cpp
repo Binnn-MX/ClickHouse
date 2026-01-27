@@ -284,9 +284,9 @@ void expandPaimonKeeperMacrosIfNeeded(
     auto * settings_query = args.storage_def->settings;
     if (!settings_query)
     {
-        ASTPtr settings_ast = std::make_shared<ASTSetQuery>();
+        auto settings_ast = std::make_shared<ASTSetQuery>();
         settings_ast->is_standalone = false;
-        args.storage_def->set(args.storage_def->settings, settings_ast);
+        args.storage_def->set(args.storage_def->settings, ASTPtr(settings_ast));
         settings_query = args.storage_def->settings;
     }
 
