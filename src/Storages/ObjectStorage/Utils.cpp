@@ -16,10 +16,8 @@
 #include <Storages/ObjectStorage/Utils.h>
 #include <Parsers/ASTCreateQuery.h>
 #include <Parsers/ASTFunction.h>
-#include <Parsers/ASTSetQuery.h>
 #include <Interpreters/evaluateConstantExpression.h>
 #include <Storages/checkAndGetLiteralArgument.h>
-#include <Poco/UUIDGenerator.h>
 
 namespace DB
 {
@@ -33,6 +31,7 @@ namespace ErrorCodes
 
 namespace DataLakeStorageSetting
 {
+    extern const DataLakeStorageSettingsBool paimon_incremental_read;
     extern const DataLakeStorageSettingsString paimon_keeper_path;
     extern const DataLakeStorageSettingsString paimon_replica_name;
 }
@@ -268,27 +267,27 @@ void expandPaimonKeeperMacrosIfNeeded(
     if (!storage_settings)
         return;
 
+    const auto incremental_read_enabled = (*storage_settings)[DataLakeStorageSetting::paimon_incremental_read].changed
+        && (*storage_settings)[DataLakeStorageSetting::paimon_incremental_read].value;
+
     const auto has_keeper_path = (*storage_settings)[DataLakeStorageSetting::paimon_keeper_path].changed
         && !(*storage_settings)[DataLakeStorageSetting::paimon_keeper_path].value.empty();
     const auto has_replica_name = (*storage_settings)[DataLakeStorageSetting::paimon_replica_name].changed
         && !(*storage_settings)[DataLakeStorageSetting::paimon_replica_name].value.empty();
 
-    if (!has_keeper_path && !has_replica_name)
+    if (!incremental_read_enabled)
         return;
+
+    auto * settings_query = args.storage_def->settings;
+    if (!settings_query)
+        throw Exception(
+            ErrorCodes::BAD_ARGUMENTS,
+            "Paimon incremental read requires SETTINGS with paimon_keeper_path and paimon_replica_name");
 
     if (!has_keeper_path || !has_replica_name)
         throw Exception(
             ErrorCodes::BAD_ARGUMENTS,
             "To use Paimon incremental read both paimon_keeper_path and paimon_replica_name must be specified");
-
-    auto * settings_query = args.storage_def->settings;
-    if (!settings_query)
-    {
-        auto settings_ast = std::make_shared<ASTSetQuery>();
-        settings_ast->is_standalone = false;
-        args.storage_def->set(args.storage_def->settings, ASTPtr(settings_ast));
-        settings_query = args.storage_def->settings;
-    }
 
     auto keeper_path = (*storage_settings)[DataLakeStorageSetting::paimon_keeper_path].value;
     auto replica_name = (*storage_settings)[DataLakeStorageSetting::paimon_replica_name].value;
