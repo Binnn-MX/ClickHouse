@@ -123,12 +123,6 @@ DataLakeMetadataPtr PaimonMetadata::create(
                 ErrorCodes::BAD_ARGUMENTS,
                 "To use Paimon incremental read both paimon_keeper_path and paimon_replica_name must be specified");
 
-        Macros::MacroExpansionInfo keeper_info;
-        keeper_path = local_context->getMacros()->expand(keeper_path, keeper_info);
-
-        Macros::MacroExpansionInfo replica_info;
-        replica_name = local_context->getMacros()->expand(replica_name, replica_info);
-
         auto keeper = local_context->getZooKeeper();
         auto stream_log = getLogger("PaimonStreamState");
         stream_state = std::make_shared<PaimonStreamState>(keeper, keeper_path, replica_name, stream_log);
