@@ -32,10 +32,7 @@ namespace ErrorCodes
 
 namespace DataLakeStorageSetting
 {
-<<<<<<< HEAD
-=======
     extern const DataLakeStorageSettingsBool paimon_incremental_read;
->>>>>>> add_paimon_storage_engine
     extern const DataLakeStorageSettingsString paimon_keeper_path;
     extern const DataLakeStorageSettingsString paimon_replica_name;
 }
