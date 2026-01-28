@@ -139,4 +139,3 @@ Data types supported in Paimon partition keys:
 * `BIGINT`
 * `FLOAT`
 * `DOUBLE`
-
