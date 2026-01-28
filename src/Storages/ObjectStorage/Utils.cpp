@@ -329,6 +329,11 @@ void expandPaimonKeeperMacrosIfNeeded(
     info.table_id.uuid = UUIDHelpers::Nil;
     replica_name = context->getMacros()->expand(replica_name, info);
 
+    // Keep DataLakeStorageSettings in sync so DataLakeConfiguration consumers
+    // (e.g. PaimonMetadata) see the expanded values.
+    (*storage_settings)[DataLakeStorageSetting::paimon_keeper_path].value = keeper_path;
+    (*storage_settings)[DataLakeStorageSetting::paimon_replica_name].value = replica_name;
+
     settings_query->changes.setSetting("paimon_keeper_path", keeper_path);
     settings_query->changes.setSetting("paimon_replica_name", replica_name);
 }
