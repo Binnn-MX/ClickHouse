@@ -65,11 +65,6 @@ Metadata format version.
 Enable incremental read mode for Paimon tables. When enabled, the table will track the last committed snapshot
 in Keeper and only read new data since that snapshot. This is similar to Kafka streaming consumption.
 )", 0) \
-    DECLARE(Int64, paimon_target_snapshot_id, -1, R"(
-Session-level targeted snapshot read for Paimon incremental mode. When >0, the reader will only fetch the delta
-for the specified snapshot_id without advancing the committed watermark. Useful for backfill/compensation reads.
-Default: -1 (disabled)
-)", 0) \
     DECLARE(Int64, paimon_metadata_refresh_interval_ms, 0, R"(
 Background metadata refresh interval for Paimon tables (milliseconds).
 0 disables background refresh. When >0, a background task periodically calls

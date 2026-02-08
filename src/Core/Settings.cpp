@@ -7533,6 +7533,11 @@ Sets the evaluation time to be used with promql dialect. 'auto' means the curren
     DECLARE(Bool, allow_experimental_alias_table_engine, false, R"(
 Allow to create table with the Alias engine.
 )", EXPERIMENTAL) \
+    DECLARE(Int64, paimon_target_snapshot_id, -1, R"(
+Query-level targeted snapshot read for Paimon incremental mode. When >0, the reader will only fetch the delta
+for the specified snapshot_id without advancing the committed watermark.
+Default: -1 (disabled)
+)", EXPERIMENTAL) \
     DECLARE(Bool, use_paimon_partition_pruning, false, R"(
 Use Paimon partition pruning for Paimon table functions
 )", EXPERIMENTAL) \
