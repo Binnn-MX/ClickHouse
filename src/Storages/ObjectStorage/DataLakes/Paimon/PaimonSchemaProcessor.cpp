@@ -28,7 +28,7 @@ PaimonTableSchemaPtr PaimonSchemaProcessor::addSchema(const Poco::JSON::Object::
     if (!inserted)
     {
         /// Schema already exists, check if it's the same
-        if (it->second->id != schema->id || it->second->version != schema->version)
+        if (!(*it->second == *schema))
         {
             it->second = schema;
             clickhouse_schemas_by_id.erase(schema_id);

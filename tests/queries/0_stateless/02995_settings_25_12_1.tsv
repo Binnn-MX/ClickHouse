@@ -1130,6 +1130,7 @@ output_format_write_statistics	1
 page_cache_block_size	1048576
 page_cache_inject_eviction	0
 page_cache_lookahead_blocks	16
+paimon_target_snapshot_id	-1
 parallel_distributed_insert_select	2
 parallel_hash_join_threshold	100000
 parallel_replica_offset	0

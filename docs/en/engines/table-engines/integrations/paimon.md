@@ -76,7 +76,7 @@ This engine uses the same settings as the corresponding object storage engines a
 
 - `paimon_incremental_read` — enable incremental read mode.
 - `paimon_metadata_refresh_interval_ms` — refresh metadata in background.
-- `paimon_target_snapshot_id` — read a specific snapshot delta (session-level).
+- `paimon_target_snapshot_id` — read a specific snapshot delta (query-level).
 - `paimon_keeper_path` — Keeper path for incremental read state. Must be set and unique per table; supports macros such as `{database}`, `{table}`, `{uuid}`.
 - `paimon_replica_name` — Replica name for incremental read state. Must be set and unique per replica; supports macros such as `{replica}`.
 - `use_paimon_partition_pruning` — enable partition pruning for Paimon.

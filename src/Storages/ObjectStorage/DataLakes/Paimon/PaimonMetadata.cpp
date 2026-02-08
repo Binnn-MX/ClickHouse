@@ -49,13 +49,13 @@ extern const int NO_ZOOKEEPER;
 namespace Setting
 {
 extern const SettingsBool use_paimon_partition_pruning;
+extern const SettingsInt64 paimon_target_snapshot_id;
 }
 
 namespace DataLakeStorageSetting
 {
 extern const DataLakeStorageSettingsBool paimon_incremental_read;
 extern const DataLakeStorageSettingsInt64 paimon_metadata_refresh_interval_ms;
-extern const DataLakeStorageSettingsInt64 paimon_target_snapshot_id;
 extern const DataLakeStorageSettingsString paimon_keeper_path;
 extern const DataLakeStorageSettingsString paimon_replica_name;
 }
@@ -108,7 +108,6 @@ DataLakeMetadataPtr PaimonMetadata::create(
     const auto & data_lake_settings = configuration_ptr->getDataLakeSettings();
     bool incremental_read_enabled = data_lake_settings[DataLakeStorageSetting::paimon_incremental_read].value;
     Int64 metadata_refresh_interval_ms = data_lake_settings[DataLakeStorageSetting::paimon_metadata_refresh_interval_ms].value;
-    Int64 target_snapshot_id = data_lake_settings[DataLakeStorageSetting::paimon_target_snapshot_id].value;
     PaimonStreamStatePtr stream_state = nullptr;
 
     if (incremental_read_enabled)
@@ -139,7 +138,6 @@ DataLakeMetadataPtr PaimonMetadata::create(
         table_path,
         partition_default_name,
         incremental_read_enabled,
-        target_snapshot_id,
         metadata_refresh_interval_ms);
 
     return std::make_unique<PaimonMetadata>(
@@ -161,22 +159,21 @@ PaimonMetadata::PaimonMetadata(
             ? std::chrono::milliseconds(persistent_components.metadata_refresh_interval_ms)
             : std::chrono::milliseconds(0))
 {
-    /// Validate configuration
-    checkSupportedConfiguration();
-
     /// Load initial state
     auto initial_state = loadLatestState();
-    std::atomic_store_explicit(&current_state, initial_state, std::memory_order_release);
-
     if (initial_state)
     {
-        LOG_DEBUG(log, "PaimonMetadata initialized with snapshot_id={}, schema_id={}",
+        std::atomic_store_explicit(&current_state, initial_state, std::memory_order_release);
+        LOG_TRACE(log, "PaimonMetadata initialized with snapshot_id={}, schema_id={}",
                   initial_state->snapshot_id, initial_state->schema_id);
     }
     else
     {
         LOG_WARNING(log, "PaimonMetadata initialized without snapshots (no snapshot files found yet)");
     }
+
+    /// Validate configuration
+    checkSupportedConfiguration();
 
     /// Schedule background refresh if enabled
     scheduleBackgroundRefresh();
@@ -399,10 +396,11 @@ ObjectIterator PaimonMetadata::iterate(
     /// 4. Collect data files based on read mode
     Strings data_files;
 
-    /// 4.a Session-level targeted snapshot (only when incremental is enabled)
-    if (persistent_components.incremental_read_enabled && persistent_components.target_snapshot_id > 0)
+    /// 4.a Query-level targeted snapshot (only when incremental is enabled)
+    const Int64 target_snapshot_id = query_context->getSettingsRef()[Setting::paimon_target_snapshot_id];
+    if (persistent_components.incremental_read_enabled && target_snapshot_id > 0)
     {
-        auto target_state = loadStateForSnapshot(persistent_components.target_snapshot_id);
+        auto target_state = loadStateForSnapshot(target_snapshot_id);
         data_files = collectDeltaFilesForSnapshot(target_state, partition_pruner);
     }
     /// 4.b Regular incremental mode
