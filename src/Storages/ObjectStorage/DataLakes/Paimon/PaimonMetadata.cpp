@@ -2,7 +2,9 @@
 
 #if USE_AVRO
 
+#include <algorithm>
 #include <cstddef>
+#include <charconv>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -16,6 +18,7 @@
 #include <IO/ReadHelpers.h>
 #include <IO/WriteHelpers.h>
 #include <Interpreters/Context.h>
+#include <Storages/ObjectStorage/DataLakes/Common/Common.h>
 #include <Storages/ObjectStorage/DataLakes/Paimon/Constant.h>
 #include <Storages/ObjectStorage/DataLakes/Paimon/PaimonClient.h>
 #include <Storages/ObjectStorage/DataLakes/Paimon/PaimonMetadata.h>
@@ -42,6 +45,7 @@ using namespace Paimon;
 namespace ErrorCodes
 {
 extern const int BAD_ARGUMENTS;
+extern const int CANNOT_PARSE_NUMBER;
 extern const int LOGICAL_ERROR;
 extern const int NO_ZOOKEEPER;
 }
@@ -537,25 +541,46 @@ std::vector<PaimonTableStatePtr> PaimonMetadata::getSnapshotsBetween(
     Int64 from_snapshot_id, Int64 to_snapshot_id) const
 {
     std::vector<PaimonTableStatePtr> snapshots;
+    if (to_snapshot_id <= from_snapshot_id)
+        return snapshots;
 
-    /// For simplicity, we only return the latest snapshot state
-    /// In a full implementation, we would iterate through all snapshots between from and to
-    /// and collect their delta manifests
-    ///
-    /// Paimon Java implementation uses StreamTableScan which maintains a checkpoint (snapshot id)
-    /// and on each plan() call, it returns splits for the delta since the last checkpoint.
-    ///
-    /// For now, we just use the delta_manifest_list from the latest snapshot
-    /// which contains all changes in that snapshot.
-
-    if (to_snapshot_id > from_snapshot_id)
-    {
-        auto state = loadLatestState();
-        if (state && state->snapshot_id == to_snapshot_id)
+    const String prefix = PAIMON_SNAPSHOT_PRIFIX;
+    auto snapshot_files = listFiles(
+        *object_storage,
+        persistent_components.table_location,
+        PAIMON_SNAPSHOT_DIR,
+        [&prefix](const RelativePathWithMetadata & path_with_metadata)
         {
-            snapshots.push_back(state);
-        }
+            String relative_path = path_with_metadata.relative_path;
+            String file_name(relative_path.begin() + relative_path.find_last_of('/') + 1, relative_path.end());
+            return file_name.starts_with(prefix);
+        });
+
+    if (snapshot_files.empty())
+        return snapshots;
+
+    std::vector<Int64> snapshot_ids;
+    snapshot_ids.reserve(snapshot_files.size());
+
+    for (const auto & path : snapshot_files)
+    {
+        String file_name(path.begin() + path.find_last_of('/') + 1, path.end());
+        String id_string = file_name.substr(prefix.size());
+        Int64 snapshot_id = -1;
+        auto [_, ec] = std::from_chars(id_string.data(), id_string.data() + id_string.size(), snapshot_id);
+        if (ec != std::errc())
+            throw Exception(ErrorCodes::CANNOT_PARSE_NUMBER, "The Paimon snapshot file: {} id: {} is invalid.", file_name, id_string);
+
+        if (snapshot_id > from_snapshot_id && snapshot_id <= to_snapshot_id)
+            snapshot_ids.emplace_back(snapshot_id);
     }
+
+    if (snapshot_ids.empty())
+        return snapshots;
+
+    std::sort(snapshot_ids.begin(), snapshot_ids.end());
+    for (const auto snapshot_id : snapshot_ids)
+        snapshots.emplace_back(loadStateForSnapshot(snapshot_id));
 
     return snapshots;
 }
@@ -619,83 +644,38 @@ Strings PaimonMetadata::collectIncrementalDataFiles(
         LOG_INFO(log, "Reading incremental data from snapshot {} to {}",
                  *committed_snapshot_id, state->snapshot_id);
 
-        /// In Paimon, each snapshot's delta_manifest_list contains the changes in that snapshot
-        /// We need to read all delta manifests from snapshots between committed+1 and current
-        ///
-        /// For simplicity, we just read the current snapshot's delta manifest
-        /// This works correctly if we process one snapshot at a time
+        /// In Paimon, each snapshot's delta_manifest_list contains the changes in that snapshot.
+        /// We need to read all delta manifests from snapshots between committed+1 and current.
+        auto snapshots = getSnapshotsBetween(*committed_snapshot_id, state->snapshot_id);
+        if (snapshots.empty())
+            return {};
 
-        if (!state->delta_manifest_list_path.empty())
-    {
-            auto manifest_metas = getManifestList(state->delta_manifest_list_path);
-            for (const auto & meta : manifest_metas)
-            {
-                auto manifest = getManifest(meta.file_name, state->schema_id);
-                for (const auto & entry : manifest.entries)
-        {
-                    if (entry.kind == PaimonManifestEntry::Kind::DELETE)
-                continue;
-
-                    if (partition_pruner && partition_pruner->canBePruned(entry))
-                continue;
-
-                    data_files.emplace_back(
-                        std::filesystem::path(persistent_components.table_path)
-                        / entry.file.bucket_path / entry.file.file_name);
-                }
-            }
-        }
+        data_files = collectDataFilesFromManifests(snapshots, ManifestKind::Delta, partition_pruner, true, false);
     }
 
     return data_files;
 }
 
-Strings PaimonMetadata::collectDeltaFilesForSnapshot(
-    const PaimonTableStatePtr & state,
-    const std::optional<PartitionPruner> & partition_pruner) const
-{
-    Strings data_files;
-    if (!state || state->delta_manifest_list_path.empty())
-        return data_files;
-
-    auto manifest_metas = getManifestList(state->delta_manifest_list_path);
-    for (const auto & meta : manifest_metas)
-    {
-        auto manifest = getManifest(meta.file_name, state->schema_id);
-        for (const auto & entry : manifest.entries)
-        {
-            if (entry.kind == PaimonManifestEntry::Kind::DELETE)
-                continue;
-
-            if (partition_pruner && partition_pruner->canBePruned(entry))
-                continue;
-
-            data_files.emplace_back(
-                std::filesystem::path(persistent_components.table_path)
-                / entry.file.bucket_path / entry.file.file_name);
-        }
-    }
-
-    return data_files;
-}
-
-Strings PaimonMetadata::collectFullScanDataFiles(
-    const PaimonTableStatePtr & state,
-    const std::optional<PartitionPruner> & partition_pruner) const
+Strings PaimonMetadata::collectDataFilesFromManifests(
+    const std::vector<PaimonTableStatePtr> & snapshots,
+    ManifestKind kind,
+    const std::optional<PartitionPruner> & partition_pruner,
+    bool deduplicate,
+    bool track_deletes) const
 {
     Strings data_files;
     std::unordered_set<String> seen_files;
     std::unordered_set<String> delete_files;
 
-    auto collect_files = [&](const String & manifest_list_path, const String & type)
+    auto collect_from_manifest = [&](const PaimonTableStatePtr & snapshot_state, const String & manifest_list_path, const String & type)
     {
-        if (manifest_list_path.empty())
+        if (!snapshot_state || manifest_list_path.empty())
             return;
 
         auto manifest_metas = getManifestList(manifest_list_path);
         for (const auto & meta : manifest_metas)
         {
-            auto manifest = getManifest(meta.file_name, state->schema_id);
+            auto manifest = getManifest(meta.file_name, snapshot_state->schema_id);
             for (const auto & entry : manifest.entries)
             {
                 String file_path = (std::filesystem::path(persistent_components.table_path)
@@ -703,8 +683,11 @@ Strings PaimonMetadata::collectFullScanDataFiles(
 
                 if (entry.kind == PaimonManifestEntry::Kind::DELETE)
                 {
-                    delete_files.emplace(file_path);
-                    LOG_TEST(log, "{} delete file: {}", type, file_path);
+                    if (track_deletes)
+                    {
+                        delete_files.emplace(file_path);
+                        LOG_TEST(log, "{} delete file: {}", type, file_path);
+                    }
                     continue;
                 }
 
@@ -715,10 +698,10 @@ Strings PaimonMetadata::collectFullScanDataFiles(
                     continue;
                 }
 
-                if (!seen_files.emplace(file_path).second)
+                if (deduplicate && !seen_files.emplace(file_path).second)
                 {
                     LOG_TEST(log, "Skip duplicated {} data file: {}", type, file_path);
-                continue;
+                    continue;
                 }
 
                 data_files.emplace_back(std::move(file_path));
@@ -727,19 +710,40 @@ Strings PaimonMetadata::collectFullScanDataFiles(
         }
     };
 
-    /// Full scan: include base + delta, with dedup and tombstone handling.
-    collect_files(state->base_manifest_list_path, "base");
-    collect_files(state->delta_manifest_list_path, "delta");
+    for (const auto & snapshot_state : snapshots)
+    {
+        if (kind == ManifestKind::Base || kind == ManifestKind::Both)
+            collect_from_manifest(snapshot_state, snapshot_state->base_manifest_list_path, "base");
+        if (kind == ManifestKind::Delta || kind == ManifestKind::Both)
+            collect_from_manifest(snapshot_state, snapshot_state->delta_manifest_list_path, "delta");
+    }
 
-    /// Apply delete markers best-effort.
-    data_files.erase(
-        std::remove_if(
-            data_files.begin(),
-            data_files.end(),
-            [&](const String & path) { return delete_files.contains(path); }),
-        data_files.end());
+    if (track_deletes && !delete_files.empty())
+    {
+        data_files.erase(
+            std::remove_if(
+                data_files.begin(),
+                data_files.end(),
+                [&](const String & path) { return delete_files.contains(path); }),
+            data_files.end());
+    }
 
     return data_files;
+}
+
+Strings PaimonMetadata::collectDeltaFilesForSnapshot(
+    const PaimonTableStatePtr & state,
+    const std::optional<PartitionPruner> & partition_pruner) const
+{
+    return collectDataFilesFromManifests({state}, ManifestKind::Delta, partition_pruner, false, false);
+}
+
+Strings PaimonMetadata::collectFullScanDataFiles(
+    const PaimonTableStatePtr & state,
+    const std::optional<PartitionPruner> & partition_pruner) const
+{
+    /// Full scan: include base + delta, with dedup and tombstone handling.
+    return collectDataFilesFromManifests({state}, ManifestKind::Both, partition_pruner, true, true);
 }
 
 }
