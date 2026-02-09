@@ -54,6 +54,8 @@ namespace DataLakeStorageSetting
     extern DataLakeStorageSettingsString storage_aws_access_key_id;
     extern DataLakeStorageSettingsString storage_aws_secret_access_key;
     extern DataLakeStorageSettingsString storage_region;
+    extern DataLakeStorageSettingsString storage_aws_role_arn;
+    extern DataLakeStorageSettingsString storage_aws_role_session_name;
     extern DataLakeStorageSettingsString storage_catalog_url;
     extern DataLakeStorageSettingsString storage_warehouse;
     extern DataLakeStorageSettingsString storage_catalog_credential;
@@ -184,10 +186,20 @@ public:
         return std::nullopt;
     }
 
+    bool supportsTotalRows() const override
+    {
+        return DataLakeMetadata::supportsTotalRows();
+    }
+
     std::optional<size_t> totalRows(ContextPtr local_context) override
     {
         assertInitialized();
         return current_metadata->totalRows(local_context);
+    }
+
+    bool supportsTotalBytes() const override
+    {
+        return DataLakeMetadata::supportsTotalBytes();
     }
 
     std::optional<size_t> totalBytes(ContextPtr local_context) override
@@ -322,6 +334,8 @@ public:
                 .aws_access_key_id = (*settings)[DataLakeStorageSetting::storage_aws_access_key_id].value,
                 .aws_secret_access_key = (*settings)[DataLakeStorageSetting::storage_aws_secret_access_key].value,
                 .region = (*settings)[DataLakeStorageSetting::storage_region].value,
+                .aws_role_arn = (*settings)[DataLakeStorageSetting::storage_aws_role_arn].value,
+                .aws_role_session_name = (*settings)[DataLakeStorageSetting::storage_aws_role_session_name].value
             };
 
             return std::make_shared<DataLake::GlueCatalog>(
@@ -356,9 +370,9 @@ public:
         return current_metadata->optimize(metadata_snapshot, context, format_settings);
     }
 
-    void addDeleteTransformers(ObjectInfoPtr object_info, QueryPipelineBuilder & builder, const std::optional<FormatSettings> & format_settings, ContextPtr local_context) const override
+    void addDeleteTransformers(ObjectInfoPtr object_info, QueryPipelineBuilder & builder, const std::optional<FormatSettings> & format_settings, FormatParserSharedResourcesPtr parser_shared_resources, ContextPtr local_context) const override
     {
-        current_metadata->addDeleteTransformers(object_info, builder, format_settings, local_context);
+        current_metadata->addDeleteTransformers(object_info, builder, format_settings, parser_shared_resources, local_context);
     }
 
     void fromDisk(const String & disk_name, ASTs & args, ContextPtr context, bool with_structure) override
@@ -369,6 +383,15 @@ public:
         BaseStorageConfiguration::fromDisk(disk_name, args, context, with_structure);
         auto disk = context->getDisk(disk_name);
         ready_object_storage = disk->getObjectStorage();
+    }
+
+    bool supportsPrewhere() const override
+    {
+#if USE_AVRO
+        return std::is_same_v<DataLakeMetadata, IcebergMetadata>;
+#else
+        return false;
+#endif
     }
 
 private:
