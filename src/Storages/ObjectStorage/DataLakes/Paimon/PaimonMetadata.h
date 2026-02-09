@@ -93,6 +93,20 @@ public:
     void commitSnapshot(Int64 snapshot_id);
 
 private:
+    enum class ManifestKind : UInt8
+    {
+        Base,
+        Delta,
+        Both,
+    };
+
+    Strings collectDataFilesFromManifests(
+        const std::vector<PaimonTableStatePtr> & snapshots,
+        ManifestKind kind,
+        const std::optional<PartitionPruner> & partition_pruner,
+        bool deduplicate,
+        bool track_deletes) const;
+
     /// Lock-free read of current state
     PaimonTableStatePtr getCurrentState() const;
 
