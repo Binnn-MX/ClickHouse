@@ -47,6 +47,7 @@ const VersionToSettingsChangesMap & getSettingsChangesHistory()
             {"use_page_cache_for_local_disks", false, false, "New setting to use userspace page cache for local disks"},
             {"use_page_cache_for_object_storage", false, false, "New setting to use userspace page cache for object storage table functions"},
             {"use_statistics_cache", false, true, "Enable statistics cache"},
+            {"paimon_target_snapshot_id", -1, -1, "New setting."},
         });
         addSettingsChanges(settings_changes_history, "26.1",
         {
@@ -62,7 +63,6 @@ const VersionToSettingsChangesMap & getSettingsChangesHistory()
             {"correlated_subqueries_use_in_memory_buffer", false, true, "Use in-memory buffer for input of correlated subqueries by default."},
             {"allow_experimental_database_paimon_rest_catalog", false, false, "New setting"},
             {"allow_experimental_object_storage_queue_hive_partitioning", false, false, "New setting."},
-            {"paimon_target_snapshot_id", -1, -1, "New setting."},
             {"type_json_use_partial_match_to_skip_paths_by_regexp", false, true, "Add new setting that allows to use partial match in regexp paths skip in JSON type parsing"},
             {"max_insert_block_size_bytes", 0, 0, "New setting that allows to control the size of blocks in bytes during parsing of data in Row Input Format."},
             {"max_insert_block_size_rows", DEFAULT_INSERT_BLOCK_SIZE, DEFAULT_INSERT_BLOCK_SIZE, "An alias for max_insert_block_size."},
