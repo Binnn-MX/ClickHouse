@@ -76,10 +76,29 @@ This engine uses the same settings as the corresponding object storage engines a
 
 - `paimon_incremental_read` — enable incremental read mode.
 - `paimon_metadata_refresh_interval_ms` — refresh metadata in background.
-- `paimon_target_snapshot_id` — read a specific snapshot delta (query-level).
 - `paimon_keeper_path` — Keeper path for incremental read state. Must be set and unique per table; supports macros such as `{database}`, `{table}`, `{uuid}`.
 - `paimon_replica_name` — Replica name for incremental read state. Must be set and unique per replica; supports macros such as `{replica}`.
-- `use_paimon_partition_pruning` — enable partition pruning for Paimon.
+
+## Incremental read examples {#incremental-read-examples}
+
+Incremental read with Keeper state:
+
+```sql
+CREATE TABLE paimon_inc
+ENGINE = PaimonS3(paimon_conf, filename = 'paimon_all_types')
+SETTINGS
+    paimon_incremental_read = 1,
+    paimon_keeper_path = '/clickhouse/{database}/{uuid}',
+    paimon_replica_name = '{replica}';
+```
+
+Targeted snapshot delta read (query-level):
+
+```sql
+SELECT count()
+FROM paimon_inc
+SETTINGS paimon_target_snapshot_id = 1;
+```
 
 ## Limitations {#limitations}
 
