@@ -134,7 +134,9 @@ private:
     /// Collect data files for incremental read (from committed snapshot to current)
     Strings collectIncrementalDataFiles(
         const PaimonTableStatePtr & state,
-        const std::optional<PartitionPruner> & partition_pruner) const;
+        const std::optional<PartitionPruner> & partition_pruner,
+        UInt64 max_consume_snapshots,
+        std::optional<Int64> & last_consumed_snapshot_id) const;
 
     /// Collect data files for a specific snapshot delta (session-level targeted read)
     Strings collectDeltaFilesForSnapshot(

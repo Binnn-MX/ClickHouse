@@ -7563,6 +7563,9 @@ Query-level targeted snapshot read for Paimon incremental mode. When >0, the rea
 for the specified snapshot_id without advancing the committed watermark.
 Default: -1 (disabled)
 )", EXPERIMENTAL) \
+    DECLARE(UInt64, max_consume_snapshots, 0, R"(
+Maximum number of Paimon snapshots to consume per incremental read. 0 means no limit.
+)", EXPERIMENTAL) \
     DECLARE(Bool, use_paimon_partition_pruning, false, R"(
 Use Paimon partition pruning for Paimon table functions
 )", EXPERIMENTAL) \

@@ -48,6 +48,7 @@ const VersionToSettingsChangesMap & getSettingsChangesHistory()
             {"use_page_cache_for_object_storage", false, false, "New setting to use userspace page cache for object storage table functions"},
             {"use_statistics_cache", false, true, "Enable statistics cache"},
             {"paimon_target_snapshot_id", -1, -1, "New setting."},
+            {"max_consume_snapshots", 0, 0, "New setting."},
         });
         addSettingsChanges(settings_changes_history, "26.1",
         {

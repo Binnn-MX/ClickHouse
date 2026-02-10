@@ -2,9 +2,7 @@
 
 #if USE_AVRO
 
-#include <algorithm>
 #include <cstddef>
-#include <charconv>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -18,7 +16,6 @@
 #include <IO/ReadHelpers.h>
 #include <IO/WriteHelpers.h>
 #include <Interpreters/Context.h>
-#include <Storages/ObjectStorage/DataLakes/Common/Common.h>
 #include <Storages/ObjectStorage/DataLakes/Paimon/Constant.h>
 #include <Storages/ObjectStorage/DataLakes/Paimon/PaimonClient.h>
 #include <Storages/ObjectStorage/DataLakes/Paimon/PaimonMetadata.h>
@@ -45,7 +42,7 @@ using namespace Paimon;
 namespace ErrorCodes
 {
 extern const int BAD_ARGUMENTS;
-extern const int CANNOT_PARSE_NUMBER;
+extern const int FILE_DOESNT_EXIST;
 extern const int LOGICAL_ERROR;
 extern const int NO_ZOOKEEPER;
 }
@@ -54,6 +51,7 @@ namespace Setting
 {
 extern const SettingsBool use_paimon_partition_pruning;
 extern const SettingsInt64 paimon_target_snapshot_id;
+extern const SettingsUInt64 max_consume_snapshots;
 }
 
 namespace DataLakeStorageSetting
@@ -429,10 +427,12 @@ ObjectIterator PaimonMetadata::iterate(
         stream_state->acquireProcessingLock();
         lock_acquired = true;
 
-        data_files = collectIncrementalDataFiles(state, partition_pruner);
+        std::optional<Int64> last_consumed_snapshot_id;
+        const UInt64 max_consume_snapshots = query_context->getSettingsRef()[Setting::max_consume_snapshots];
+        data_files = collectIncrementalDataFiles(state, partition_pruner, max_consume_snapshots, last_consumed_snapshot_id);
 
-        if (!data_files.empty())
-            stream_state->setCommittedSnapshot(state->snapshot_id);
+        if (!data_files.empty() && last_consumed_snapshot_id)
+            stream_state->setCommittedSnapshot(*last_consumed_snapshot_id);
     }
     else
     {
@@ -514,7 +514,7 @@ PaimonTableStatePtr PaimonMetadata::loadStateForSnapshot(Int64 snapshot_id) cons
     /// Build snapshot file path: `table_location/snapshot/snapshot-<id>`
     const String snapshot_path = (std::filesystem::path(persistent_components.table_location)
         / PAIMON_SNAPSHOT_DIR
-        / fmt::format("{}{}", PAIMON_SNAPSHOT_PRIFIX, snapshot_id));
+        / fmt::format("{}{}", PAIMON_SNAPSHOT_PREFIX, snapshot_id));
     auto snapshot = table_client->getSnapshot({snapshot_id, snapshot_path});
 
     /// Ensure schema is cached for this snapshot_id
@@ -544,52 +544,35 @@ std::vector<PaimonTableStatePtr> PaimonMetadata::getSnapshotsBetween(
     if (to_snapshot_id <= from_snapshot_id)
         return snapshots;
 
-    const String prefix = PAIMON_SNAPSHOT_PRIFIX;
-    auto snapshot_files = listFiles(
-        *object_storage,
-        persistent_components.table_location,
-        PAIMON_SNAPSHOT_DIR,
-        [&prefix](const RelativePathWithMetadata & path_with_metadata)
-        {
-            String relative_path = path_with_metadata.relative_path;
-            String file_name(relative_path.begin() + relative_path.find_last_of('/') + 1, relative_path.end());
-            return file_name.starts_with(prefix);
-        });
-
-    if (snapshot_files.empty())
-        return snapshots;
-
-    std::vector<Int64> snapshot_ids;
-    snapshot_ids.reserve(snapshot_files.size());
-
-    for (const auto & path : snapshot_files)
+    snapshots.reserve(static_cast<size_t>(to_snapshot_id - from_snapshot_id));
+    for (Int64 snapshot_id = from_snapshot_id + 1; snapshot_id <= to_snapshot_id; ++snapshot_id)
     {
-        String file_name(path.begin() + path.find_last_of('/') + 1, path.end());
-        String id_string = file_name.substr(prefix.size());
-        Int64 snapshot_id = -1;
-        auto [_, ec] = std::from_chars(id_string.data(), id_string.data() + id_string.size(), snapshot_id);
-        if (ec != std::errc())
-            throw Exception(ErrorCodes::CANNOT_PARSE_NUMBER, "The Paimon snapshot file: {} id: {} is invalid.", file_name, id_string);
-
-        if (snapshot_id > from_snapshot_id && snapshot_id <= to_snapshot_id)
-            snapshot_ids.emplace_back(snapshot_id);
+        try
+        {
+            snapshots.emplace_back(loadStateForSnapshot(snapshot_id));
+        }
+        catch (const Exception & e)
+        {
+            if (e.code() == ErrorCodes::FILE_DOESNT_EXIST)
+            {
+                LOG_WARNING(log, "Paimon snapshot file for id {} not found, skip it", snapshot_id);
+                continue;
+            }
+            throw;
+        }
     }
-
-    if (snapshot_ids.empty())
-        return snapshots;
-
-    std::sort(snapshot_ids.begin(), snapshot_ids.end());
-    for (const auto snapshot_id : snapshot_ids)
-        snapshots.emplace_back(loadStateForSnapshot(snapshot_id));
 
     return snapshots;
 }
 
 Strings PaimonMetadata::collectIncrementalDataFiles(
     const PaimonTableStatePtr & state,
-    const std::optional<PartitionPruner> & partition_pruner) const
+    const std::optional<PartitionPruner> & partition_pruner,
+    UInt64 max_consume_snapshots,
+    std::optional<Int64> & last_consumed_snapshot_id) const
 {
     Strings data_files;
+    last_consumed_snapshot_id.reset();
 
     /// Get last committed snapshot ID from Keeper
     auto committed_snapshot_id = getCommittedSnapshotId();
@@ -600,36 +583,9 @@ Strings PaimonMetadata::collectIncrementalDataFiles(
         /// First read should include full snapshot (base + delta) to build the initial watermark.
         LOG_INFO(log, "No committed snapshot found, performing initial full read (base+delta) for snapshot_id={}",
                  state->snapshot_id);
-
-        std::unordered_set<String> seen_files;
-        auto collect_manifest_list = [&](const String & manifest_list_path)
-        {
-            if (manifest_list_path.empty())
-                return;
-
-            auto manifest_metas = getManifestList(manifest_list_path);
-            for (const auto & meta : manifest_metas)
-            {
-                auto manifest = getManifest(meta.file_name, state->schema_id);
-                for (const auto & entry : manifest.entries)
-                {
-                    if (entry.kind == PaimonManifestEntry::Kind::DELETE)
-                        continue;
-
-                    if (partition_pruner && partition_pruner->canBePruned(entry))
-                        continue;
-
-                    String file_path = (std::filesystem::path(persistent_components.table_path)
-                        / entry.file.bucket_path / entry.file.file_name);
-                    if (!seen_files.emplace(file_path).second)
-                        continue;
-                    data_files.emplace_back(std::move(file_path));
-                }
-            }
-        };
-
-        collect_manifest_list(state->base_manifest_list_path);
-        collect_manifest_list(state->delta_manifest_list_path);
+        data_files = collectDataFilesFromManifests({state}, ManifestKind::Both, partition_pruner, true, false);
+        if (!data_files.empty())
+            last_consumed_snapshot_id = state->snapshot_id;
     }
     else if (*committed_snapshot_id >= state->snapshot_id)
     {
@@ -650,7 +606,12 @@ Strings PaimonMetadata::collectIncrementalDataFiles(
         if (snapshots.empty())
             return {};
 
+        if (max_consume_snapshots > 0 && snapshots.size() > max_consume_snapshots)
+            snapshots.resize(static_cast<size_t>(max_consume_snapshots));
+
         data_files = collectDataFilesFromManifests(snapshots, ManifestKind::Delta, partition_pruner, true, false);
+        if (!data_files.empty())
+            last_consumed_snapshot_id = snapshots.back()->snapshot_id;
     }
 
     return data_files;
