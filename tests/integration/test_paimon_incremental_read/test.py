@@ -127,8 +127,8 @@ def _create_clickhouse_table_for_paimon_incremental_read(table_name: str):
         "ENGINE = PaimonLocal('{table_path}') "
         "SETTINGS "
         "paimon_incremental_read = 1, "
-        f"paimon_keeper_path = '/clickhouse/tables/{{uuid}}', "
-        f"paimon_replica_name = '{{replica}}', "
+        "paimon_keeper_path = '/clickhouse/tables/{{uuid}}', "
+        "paimon_replica_name = '{{replica}}', "
         "paimon_metadata_refresh_interval_ms = 100".format(
             table_name=table_name, table_path=PAIMON_TABLE_PATH
         )
