@@ -26,6 +26,7 @@ node = cluster.add_instance(
     stay_alive=True,
     with_zookeeper=True,
     main_configs=["configs/zookeeper.xml"],
+    macros={"shard": "s1", "replica": "r1"},
 )
 
 
