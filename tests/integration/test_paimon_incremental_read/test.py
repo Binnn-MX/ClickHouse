@@ -150,13 +150,25 @@ def test_paimon_incremental_read_via_paimon_table_engine(started_cluster):
         shell=True,
     )
 
-    # Create a normal Paimon data table from writer side (no REST catalog).
-    _run_writer(instance_id, start_id=0, rows_per_commit=0, commit_times=0)
+    # Warm-up commit: ensure there is at least one parquet file so schema can be inferred.
+    _run_writer(instance_id, start_id=0, rows_per_commit=1, commit_times=1)
 
     _create_clickhouse_table_for_paimon_incremental_read(CH_TABLE_NAME)
 
+    # Consume warm-up snapshot and reset incremental state baseline.
+    _wait_until_query_result(
+        f"SELECT count() FROM {CH_TABLE_NAME}",
+        "1\n",
+        database="default",
+    )
+    _wait_until_query_result(
+        f"SELECT count() FROM {CH_TABLE_NAME}",
+        "0\n",
+        database="default",
+    )
+
     # First snapshot: 10 rows.
-    _run_writer(instance_id, start_id=0, rows_per_commit=10, commit_times=1)
+    _run_writer(instance_id, start_id=1, rows_per_commit=10, commit_times=1)
     _wait_until_query_result(
         f"SELECT count() FROM {CH_TABLE_NAME}",
         "10\n",
@@ -169,7 +181,7 @@ def test_paimon_incremental_read_via_paimon_table_engine(started_cluster):
     )
 
     # Second snapshot: another 10 rows.
-    _run_writer(instance_id, start_id=10, rows_per_commit=10, commit_times=1)
+    _run_writer(instance_id, start_id=11, rows_per_commit=10, commit_times=1)
     _wait_until_query_result(
         f"SELECT count() FROM {CH_TABLE_NAME}",
         "10\n",
@@ -183,12 +195,12 @@ def test_paimon_incremental_read_via_paimon_table_engine(started_cluster):
 
     # Targeted snapshot reads are deterministic and do not advance stream state.
     _wait_until_query_result(
-        f"SELECT count() FROM {CH_TABLE_NAME} SETTINGS paimon_target_snapshot_id=1",
+        f"SELECT count() FROM {CH_TABLE_NAME} SETTINGS paimon_target_snapshot_id=2",
         "10\n",
         database="default",
     )
     _wait_until_query_result(
-        f"SELECT count() FROM {CH_TABLE_NAME} SETTINGS paimon_target_snapshot_id=1",
+        f"SELECT count() FROM {CH_TABLE_NAME} SETTINGS paimon_target_snapshot_id=2",
         "10\n",
         database="default",
     )
@@ -204,12 +216,24 @@ def test_paimon_incremental_read_via_paimon_table_engine(started_cluster):
         shell=True,
     )
 
-    # Recreate a clean normal Paimon table.
-    _run_writer(instance_id, start_id=0, rows_per_commit=0, commit_times=0)
+    # Recreate clean Paimon table with one warm-up snapshot for schema inference.
+    _run_writer(instance_id, start_id=0, rows_per_commit=1, commit_times=1)
     _create_clickhouse_table_for_paimon_incremental_read(CH_TABLE_NAME_WITH_LIMIT)
 
+    # Consume warm-up snapshot before testing max_consume_snapshots behavior.
+    _wait_until_query_result(
+        f"SELECT count() FROM {CH_TABLE_NAME_WITH_LIMIT}",
+        "1\n",
+        database="default",
+    )
+    _wait_until_query_result(
+        f"SELECT count() FROM {CH_TABLE_NAME_WITH_LIMIT}",
+        "0\n",
+        database="default",
+    )
+
     # Produce 3 snapshots, each snapshot contains 10 rows.
-    _run_writer(instance_id, start_id=0, rows_per_commit=10, commit_times=3)
+    _run_writer(instance_id, start_id=1, rows_per_commit=10, commit_times=3)
     _wait_until_query_result(
         f"SELECT count() FROM {CH_TABLE_NAME_WITH_LIMIT} SETTINGS max_consume_snapshots=2",
         "20\n",
