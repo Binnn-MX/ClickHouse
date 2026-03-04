@@ -232,6 +232,7 @@ PaimonTableStatePtr PaimonMetadata::loadLatestState() const
         snapshot.schema_id,
         snapshot.base_manifest_list,
         snapshot.delta_manifest_list,
+        snapshot.commit_kind,
         snapshot.time_millis,
         snapshot.total_record_count,
         snapshot.delta_record_count,
@@ -530,6 +531,7 @@ PaimonTableStatePtr PaimonMetadata::loadStateForSnapshot(Int64 snapshot_id) cons
         snapshot.schema_id,
         snapshot.base_manifest_list,
         snapshot.delta_manifest_list,
+        snapshot.commit_kind,
         snapshot.time_millis,
         snapshot.total_record_count,
         snapshot.delta_record_count,
@@ -538,18 +540,33 @@ PaimonTableStatePtr PaimonMetadata::loadStateForSnapshot(Int64 snapshot_id) cons
 }
 
 std::vector<PaimonTableStatePtr> PaimonMetadata::getSnapshotsBetween(
-    Int64 from_snapshot_id, Int64 to_snapshot_id) const
+    Int64 from_snapshot_id, Int64 to_snapshot_id, UInt64 max_snapshots_to_load, bool skip_compact) const
 {
     std::vector<PaimonTableStatePtr> snapshots;
     if (to_snapshot_id <= from_snapshot_id)
         return snapshots;
 
-    snapshots.reserve(static_cast<size_t>(to_snapshot_id - from_snapshot_id));
+    size_t snapshots_to_reserve = static_cast<size_t>(to_snapshot_id - from_snapshot_id);
+    if (max_snapshots_to_load > 0 && snapshots_to_reserve > max_snapshots_to_load)
+        snapshots_to_reserve = static_cast<size_t>(max_snapshots_to_load);
+    snapshots.reserve(snapshots_to_reserve);
+
     for (Int64 snapshot_id = from_snapshot_id + 1; snapshot_id <= to_snapshot_id; ++snapshot_id)
     {
+        if (max_snapshots_to_load > 0 && snapshots.size() >= max_snapshots_to_load)
+            break;
+
         try
         {
-            snapshots.emplace_back(loadStateForSnapshot(snapshot_id));
+            auto state = loadStateForSnapshot(snapshot_id);
+
+            if (skip_compact && state->isCompact())
+            {
+                LOG_DEBUG(log, "Skipping Compact snapshot_id={} in incremental read", snapshot_id);
+                continue;
+            }
+
+            snapshots.emplace_back(std::move(state));
         }
         catch (const Exception & e)
         {
@@ -602,12 +619,10 @@ Strings PaimonMetadata::collectIncrementalDataFiles(
 
         /// In Paimon, each snapshot's delta_manifest_list contains the changes in that snapshot.
         /// We need to read all delta manifests from snapshots between committed+1 and current.
-        auto snapshots = getSnapshotsBetween(*committed_snapshot_id, state->snapshot_id);
+        /// Skip Compact snapshots: their delta manifests contain compaction output (not new data).
+        auto snapshots = getSnapshotsBetween(*committed_snapshot_id, state->snapshot_id, max_consume_snapshots, /*skip_compact=*/true);
         if (snapshots.empty())
             return {};
-
-        if (max_consume_snapshots > 0 && snapshots.size() > max_consume_snapshots)
-            snapshots.resize(static_cast<size_t>(max_consume_snapshots));
 
         data_files = collectDataFilesFromManifests(snapshots, ManifestKind::Delta, partition_pruner, true, false);
         if (!data_files.empty())

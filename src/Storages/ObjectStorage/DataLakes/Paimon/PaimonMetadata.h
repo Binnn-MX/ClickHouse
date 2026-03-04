@@ -116,8 +116,12 @@ private:
     /// Load state for a specific snapshot ID
     PaimonTableStatePtr loadStateForSnapshot(Int64 snapshot_id) const;
 
-    /// Get all snapshots between from_snapshot (exclusive) and to_snapshot (inclusive)
-    std::vector<PaimonTableStatePtr> getSnapshotsBetween(Int64 from_snapshot_id, Int64 to_snapshot_id) const;
+    /// Get snapshots between from_snapshot (exclusive) and to_snapshot (inclusive).
+    /// If max_snapshots_to_load > 0, stop loading once the limit is reached.
+    /// If skip_compact is true, snapshots with commit_kind == "COMPACT" are excluded
+    /// (used by incremental read to avoid re-processing compacted data).
+    std::vector<PaimonTableStatePtr> getSnapshotsBetween(
+        Int64 from_snapshot_id, Int64 to_snapshot_id, UInt64 max_snapshots_to_load = 0, bool skip_compact = false) const;
 
     /// Extract table state from storage_metadata
     static PaimonTableStatePtr extractTableState(StorageMetadataPtr storage_metadata);
