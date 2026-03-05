@@ -6,30 +6,34 @@
 #include <memory>
 #include <optional>
 #include <base/types.h>
+#include <IO/ReadBuffer.h>
+#include <IO/WriteBuffer.h>
 #include <Storages/StorageInMemoryMetadata.h>
 
-namespace DB
+namespace DB::Paimon
 {
 
 /// Immutable table state snapshot for Paimon.
-/// Once created, it should never be modified.
-/// Used for snapshot isolation and lock-free reads.
-struct PaimonTableState
+/// Follows the same naming convention as Iceberg::TableStateSnapshot
+/// and DeltaLake::TableStateSnapshot for consistency in
+/// the DataLakeTableStateSnapshot variant.
+struct TableStateSnapshot
 {
-    const Int64 snapshot_id;
-    const Int64 schema_id;
-    const String base_manifest_list_path;
-    const String delta_manifest_list_path;
-    const String commit_kind;
-    const Int64 commit_time_millis;
+    Int64 snapshot_id{-1};
+    Int64 schema_id{-1};
+    String base_manifest_list_path;
+    String delta_manifest_list_path;
+    String commit_kind;
+    Int64 commit_time_millis{0};
 
-    /// Optional pre-computed values for quick checks
-    const std::optional<Int64> total_record_count;
-    const std::optional<Int64> delta_record_count;
-    const std::optional<Int64> changelog_record_count;
-    const std::optional<Int64> watermark;
+    std::optional<Int64> total_record_count;
+    std::optional<Int64> delta_record_count;
+    std::optional<Int64> changelog_record_count;
+    std::optional<Int64> watermark;
 
-    PaimonTableState(
+    TableStateSnapshot() = default;
+
+    TableStateSnapshot(
         Int64 snapshot_id_,
         Int64 schema_id_,
         String base_manifest_list_path_,
@@ -55,18 +59,28 @@ struct PaimonTableState
 
     bool isCompact() const { return commit_kind == "COMPACT"; }
 
-    bool operator==(const PaimonTableState & other) const
+    bool operator==(const TableStateSnapshot & other) const
     {
         return snapshot_id == other.snapshot_id && schema_id == other.schema_id;
     }
 
-    bool operator!=(const PaimonTableState & other) const { return !(*this == other); }
+    bool operator!=(const TableStateSnapshot & other) const { return !(*this == other); }
+
+    void serialize(WriteBuffer & out) const;
+    static TableStateSnapshot deserialize(ReadBuffer & in, int datalake_state_protocol_version);
 };
 
-using PaimonTableStatePtr = std::shared_ptr<const PaimonTableState>;
+using TableStateSnapshotPtr = std::shared_ptr<const TableStateSnapshot>;
 
-/// Type alias for DataLake table state variant
-using PaimonTableStateSnapshot = PaimonTableState;
+}
+
+namespace DB
+{
+
+/// Backward-compatible aliases so that PaimonMetadata.h/cpp can continue
+/// using the old names without mass-renaming every occurrence.
+using PaimonTableState = Paimon::TableStateSnapshot;
+using PaimonTableStatePtr = Paimon::TableStateSnapshotPtr;
 
 }
 
