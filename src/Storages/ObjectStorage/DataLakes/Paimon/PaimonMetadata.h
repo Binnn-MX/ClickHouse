@@ -11,7 +11,7 @@
 #include <Disks/IStoragePolicy.h>
 #include <Interpreters/Context_fwd.h>
 #include <Storages/ObjectStorage/DataLakes/IDataLakeMetadata.h>
-#include <Storages/ObjectStorage/DataLakes/Paimon/PaimonTableState.h>
+#include <Storages/ObjectStorage/DataLakes/Paimon/PaimonTableStateSnapshot.h>
 #include <Storages/ObjectStorage/DataLakes/Paimon/PaimonPersistentComponents.h>
 #include <Storages/ObjectStorage/DataLakes/Paimon/PaimonClient.h>
 #include <Storages/ObjectStorage/DataLakes/Paimon/PartitionPruner.h>

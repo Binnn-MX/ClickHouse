@@ -8,15 +8,13 @@
 #include <base/types.h>
 #include <IO/ReadBuffer.h>
 #include <IO/WriteBuffer.h>
-#include <Storages/StorageInMemoryMetadata.h>
 
-namespace DB::Paimon
+namespace Paimon
 {
 
 /// Immutable table state snapshot for Paimon.
-/// Follows the same naming convention as Iceberg::TableStateSnapshot
-/// and DeltaLake::TableStateSnapshot for consistency in
-/// the DataLakeTableStateSnapshot variant.
+/// Lives in the top-level ::Paimon namespace (same as other Paimon types),
+/// following the same pattern as DeltaLake::TableStateSnapshot.
 struct TableStateSnapshot
 {
     Int64 snapshot_id{-1};
@@ -66,8 +64,8 @@ struct TableStateSnapshot
 
     bool operator!=(const TableStateSnapshot & other) const { return !(*this == other); }
 
-    void serialize(WriteBuffer & out) const;
-    static TableStateSnapshot deserialize(ReadBuffer & in, int datalake_state_protocol_version);
+    void serialize(DB::WriteBuffer & out) const;
+    static TableStateSnapshot deserialize(DB::ReadBuffer & in, int datalake_state_protocol_version);
 };
 
 using TableStateSnapshotPtr = std::shared_ptr<const TableStateSnapshot>;
@@ -85,4 +83,3 @@ using PaimonTableStatePtr = Paimon::TableStateSnapshotPtr;
 }
 
 #endif
-

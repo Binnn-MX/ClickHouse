@@ -8,7 +8,7 @@
 #endif
 
 #if USE_AVRO
-#include <Storages/ObjectStorage/DataLakes/Paimon/PaimonTableState.h>
+#include <Storages/ObjectStorage/DataLakes/Paimon/PaimonTableStateSnapshot.h>
 #endif
 
 namespace DB
