@@ -31,12 +31,12 @@ void TableStateSnapshot::serialize(DB::WriteBuffer & out) const
 
 TableStateSnapshot TableStateSnapshot::deserialize(DB::ReadBuffer & in, const int datalake_state_protocol_version)
 {
-    if (datalake_state_protocol_version <= 0 || datalake_state_protocol_version > DATA_LAKE_TABLE_STATE_SNAPSHOT_PROTOCOL_VERSION)
+    if (datalake_state_protocol_version <= 0 || datalake_state_protocol_version > DB::DATA_LAKE_TABLE_STATE_SNAPSHOT_PROTOCOL_VERSION)
         throw DB::Exception(
             DB::ErrorCodes::NOT_IMPLEMENTED,
             "Cannot deserialize Paimon::TableStateSnapshot with protocol version {}, maximum supported version is {}",
             datalake_state_protocol_version,
-            DATA_LAKE_TABLE_STATE_SNAPSHOT_PROTOCOL_VERSION);
+            DB::DATA_LAKE_TABLE_STATE_SNAPSHOT_PROTOCOL_VERSION);
 
     TableStateSnapshot state;
     DB::readIntBinary(state.snapshot_id, in);
