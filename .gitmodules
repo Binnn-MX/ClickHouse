@@ -396,3 +396,6 @@
 [submodule "contrib/silk"]
 	path = contrib/silk
 	url = https://github.com/ClickHouse/silk.git
+[submodule "contrib/paimon-cpp"]
+	path = contrib/paimon-cpp
+	url = https://github.com/alibaba/paimon-cpp.git

@@ -31,6 +31,11 @@
 #include <Storages/ObjectStorage/DataLakes/DeltaLake/TableChanges.h>
 #include <Storages/ObjectStorage/DataLakes/DeltaLake/TableSnapshot.h>
 #include <Storages/ObjectStorage/DataLakes/DeltaLakeMetadataDeltaKernel.h>
+#if USE_PAIMON_CPP && (USE_ARROW || USE_ORC || USE_PARQUET)
+#include <Storages/ObjectStorage/DataLakes/Paimon/PaimonMetadata.h>
+#include <Storages/ObjectStorage/DataLakes/Paimon/PaimonSDKFileSystem.h>
+#include <Storages/ObjectStorage/DataLakes/Paimon/ReadFromPaimonSDKStep.h>
+#endif
 #include <Interpreters/StorageID.h>
 #include <Databases/LoadingStrictnessLevel.h>
 #include <Databases/DataLake/Common.h>
@@ -48,6 +53,7 @@ namespace Setting
     extern const SettingsInt64 delta_lake_snapshot_start_version;
     extern const SettingsInt64 delta_lake_snapshot_end_version;
     extern const SettingsUInt64 max_streams_for_files_processing_in_cluster_functions;
+    extern const SettingsBool use_paimon_sdk_read;
 }
 
 namespace ErrorCodes
@@ -525,6 +531,36 @@ void StorageObjectStorage::read(
         }
     }
 #endif
+
+#if USE_PAIMON_CPP && (USE_ARROW || USE_ORC || USE_PARQUET)
+    if (configuration->isDataLakeConfiguration() && settings[Setting::use_paimon_sdk_read])
+    {
+        if (const auto * paimon_metadata = dynamic_cast<const PaimonMetadata *>(configuration->getExternalMetadata());
+            paimon_metadata != nullptr)
+        {
+            auto source_header = storage_snapshot->getSampleBlockForColumns(column_names);
+            auto table_schema = paimon_metadata->getTableSchema(local_context);
+            auto paimon_fs = createPaimonFileSystem(object_storage, local_context);
+
+            auto paimon_format_settings = format_settings.has_value() ? format_settings.value() : getFormatSettings(local_context);
+
+            auto read_step = std::make_unique<ReadFromPaimonSDKStep>(
+                source_header,
+                column_names,
+                table_schema,
+                query_info,
+                storage_snapshot,
+                num_streams,
+                local_context,
+                std::move(paimon_fs),
+                paimon_metadata->getTableLocation(),
+                paimon_format_settings);
+            query_plan.addStep(std::move(read_step));
+            return;
+        }
+    }
+#endif
+
     auto read_from_format_info = configuration->prepareReadingFromFormat(
         object_storage,
         column_names,

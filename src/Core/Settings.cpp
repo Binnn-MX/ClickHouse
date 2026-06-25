@@ -8190,6 +8190,10 @@ Maximum number of Paimon snapshots to consume per incremental read. 0 means no l
     DECLARE(Bool, use_paimon_partition_pruning, false, R"(
 Use Paimon partition pruning for Paimon table functions
 )", EXPERIMENTAL) \
+    DECLARE(Bool, use_paimon_sdk_read, false, R"(
+When enabled, use the paimon-cpp SDK for reading Paimon tables instead of the built-in file iterator pipeline.
+The SDK handles merge-on-read, deletion vectors, and other advanced Paimon features natively.
+)", EXPERIMENTAL) \
     DECLARE(Bool, allow_experimental_object_storage_queue_hive_partitioning, false, R"(
 Allow to use hive partitioning with S3Queue/AzureQueue engines
     )", EXPERIMENTAL) \

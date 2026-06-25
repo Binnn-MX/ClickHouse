@@ -103,6 +103,9 @@ public:
     /// inside iterate(). This method exists for manual overrides only.
     void commitSnapshot(Int64 snapshot_id);
 
+    /// Get the table location (full path like s3://bucket/path/to/table)
+    const String & getTableLocation() const { return persistent_components.table_location; }
+
 private:
     enum class ManifestKind : UInt8
     {

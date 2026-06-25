@@ -677,6 +677,10 @@ if (TARGET ch_contrib::avrocpp)
     target_link_libraries(dbms PRIVATE ch_contrib::avrocpp)
 endif ()
 
+if (TARGET ch_contrib::paimon_cpp)
+    target_link_libraries(dbms PRIVATE ch_contrib::paimon_cpp)
+endif ()
+
 set_source_files_properties(Common/CaresPTRResolver.cpp PROPERTIES COMPILE_FLAGS -Wno-reserved-identifier)
 target_link_libraries (clickhouse_common_io PRIVATE ch_contrib::c-ares)
 
