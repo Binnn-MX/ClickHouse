@@ -20,7 +20,7 @@ Creating `Paimon*` tables is gated by `allow_experimental_paimon_storage_engine`
 SET allow_experimental_paimon_storage_engine = 1;
 
 CREATE TABLE paimon_table_s3
-    ENGINE = PaimonS3(url,  [, access_key_id, secret_access_key] [,format] [,structure] [,compression])
+    ENGINE = PaimonS3(url,  [, access_key_id, secret_access_key] [,format] [,compression])
 
 CREATE TABLE paimon_table_azure
     ENGINE = PaimonAzure(connection_string|storage_account_url, container_name, blobpath, [,account_name], [,account_key] [,format] [,compression_method])
@@ -76,7 +76,7 @@ CREATE TABLE paimon_table ENGINE=PaimonS3(paimon_conf, filename = 'test_table')
 This engine uses the same settings as the corresponding object storage engines and adds Paimon-specific settings:
 
 - `allow_experimental_paimon_storage_engine` — enables creation of `Paimon`, `PaimonS3`, `PaimonAzure`, `PaimonHDFS`, and `PaimonLocal` table engines. Default: `0` (disabled).
-- `use_paimon_metadata_files_cache` — enables Paimon metadata files cache for the Paimon table engine and table functions. Set to `1` to enable metadata cache, `0` to disable. Default: `0`.
+- `use_paimon_metadata_files_cache` — enables the Paimon metadata files cache (caches deserialized manifest lists and manifests). Set to `1` to enable, `0` to disable. Default: `0`. How this setting takes effect differs between table functions and persistent table engines — see the note below.
 - `paimon_incremental_read` — enable incremental read mode.
 - `paimon_metadata_refresh_interval_sec` — background metadata refresh interval in seconds. When set to a value greater than 0, a background task periodically pulls the latest snapshot and schema from object storage. Default: 30.
 - `paimon_keeper_path` — Keeper path for incremental read state. Must be set and unique per table; supports macros such as `{database}`, `{table}`, `{uuid}`.
@@ -91,6 +91,15 @@ SET use_paimon_metadata_files_cache = 1;
 CREATE TABLE paimon_cached
 ENGINE = PaimonS3(paimon_conf, filename = 'paimon_all_types');
 ```
+
+:::note `use_paimon_metadata_files_cache` lifecycle
+How `use_paimon_metadata_files_cache` is applied depends on how the Paimon table is accessed:
+
+- **Table functions** (e.g. `SELECT ... FROM paimonS3(...)`): the cache decision is evaluated per query, so you can pass `SETTINGS use_paimon_metadata_files_cache = 1` directly in the `SELECT`.
+- **Persistent table engines** (`PaimonS3`, `PaimonAzure`, `PaimonHDFS`, `PaimonLocal`, and the `Paimon` alias): the cache decision is latched once when the table's metadata is initialized and is stored in immutable persistent components; the metadata update path deliberately does not re-read the setting. Therefore, passing `SETTINGS use_paimon_metadata_files_cache = 1` in a `SELECT` against an already-initialized persistent table has no effect — the previously latched decision keeps being used. To change it, set `use_paimon_metadata_files_cache` before the table's metadata is initialized, or `DROP` and re-`CREATE` the table with the desired value.
+
+The server-level cache capacity (`paimon_metadata_files_cache_size`) is *not* latched: it is a runtime setting that can be changed via `SYSTEM RELOAD CONFIG` and takes effect immediately even for already-initialized tables.
+:::
 
 ## Incremental read examples {#incremental-read-examples}
 
@@ -134,7 +143,7 @@ You can build an end-to-end pipeline that continuously syncs data from a Paimon 
 
 **Step 1 — Create the Paimon source table with incremental read and metadata refresh enabled.**
 
-The example below uses `PaimonLocal`. Replace the engine with `PaimonS3`, `PaimonAzure`, `PaimonHDFS`, or the `Paimon` alias as appropriate for your storage backend:
+The example below uses `PaimonLocal`. Replace the engine with `PaimonS3`, `PaimonAzure`, `PaimonHDFS`, or the auto-detecting `Paimon` engine as appropriate for your storage backend:
 
 ```sql
 SET allow_experimental_paimon_storage_engine = 1;
@@ -148,7 +157,7 @@ SETTINGS
     paimon_replica_name = '{replica}',
     paimon_metadata_refresh_interval_sec = 1;
 
--- S3 storage (Paimon is an alias for PaimonS3)
+-- S3 storage (the `Paimon` engine defaults to the S3 implementation when no `disk` is specified)
 CREATE TABLE paimon_mv_source
 ENGINE = Paimon('http://minio:9000/bucket/path/to/table', 'access_key', 'secret_key')
 SETTINGS
@@ -204,7 +213,7 @@ Stop the MV before dropping it to prevent background refresh from blocking DDL o
 
 ## Aliases {#aliases}
 
-Table engine `Paimon` is an alias to `PaimonS3` now.
+The `Paimon` table engine auto-detects the storage backend from the `disk` setting and dispatches to `PaimonS3`, `PaimonAzure`, or `PaimonLocal` accordingly. When no `disk` is specified, it defaults to the `PaimonS3` implementation.
 
 ## Virtual Columns {#virtual-columns}
 

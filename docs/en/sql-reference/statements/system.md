@@ -109,6 +109,10 @@ Clears the per-URL Confluent Schema Registry caches used by the `AvroConfluent` 
 
 Clears the parquet metadata cache.
 
+## SYSTEM CLEAR|DROP PAIMON METADATA CACHE {#drop-paimon-metadata-cache}
+
+Clears the in-memory cache of parsed Paimon metadata files (manifest lists and manifests).
+
 ## SYSTEM CLEAR|DROP TEXT INDEX CACHES {#drop-text-index-caches}
 
 Clears the text index's header, dictionary and postings caches.
@@ -441,7 +445,7 @@ Returns `Ok.` even if table does not exist. Returns error when database does not
 SYSTEM START MOVES [ON CLUSTER cluster_name] [[db.]merge_tree_family_table_name]
 ```
 
-### SYSTEM SYSTEM UNFREEZE {#query_language-system-unfreeze}
+### SYSTEM UNFREEZE {#query_language-system-unfreeze}
 
 Clears a frozen backup with the specified name from all the disks. See more about unfreezing separate parts in [ALTER TABLE table_name UNFREEZE WITH NAME ](/sql-reference/statements/alter/partition#unfreeze-partition)
 

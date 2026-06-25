@@ -171,12 +171,18 @@ DataLakeMetadataPtr PaimonMetadata::create(
             LOG_WARNING(stream_log, "Replica {} not activated for Paimon incremental read (maybe already active elsewhere)", replica_name);
     }
 
-    /// Cache decision is intentionally latched here at metadata construction time.
-    /// PaimonPersistentComponents is immutable and shared across queries, so cache_ptr
-    /// is determined once and never re-evaluated during update().  This is the same
-    /// pattern used by IcebergMetadata (and all DataLake metadata that returns
-    /// supportsUpdate() == true).  To change cache behavior for an existing table,
+    /// Only the session-level setting use_paimon_metadata_files_cache is latched here at
+    /// metadata construction time: PaimonPersistentComponents is immutable and shared across
+    /// queries, so whether this table is bound to the global cache is decided once.  This is
+    /// the same pattern used by IcebergMetadata (and all DataLake metadata that returns
+    /// supportsUpdate() == true).  To change the session-level decision for an existing table,
     /// the user must DROP + re-CREATE the table with the desired setting.
+    ///
+    /// The server-level capacity (paimon_metadata_files_cache_size) is intentionally NOT
+    /// latched: it is a runtime setting that can be changed via SYSTEM RELOAD CONFIG, so the
+    /// pointer to the global cache is always kept and the actual usability is evaluated
+    /// dynamically at read time via isMetadataCacheActive().  This way raising/lowering the
+    /// size takes effect immediately even for already-created tables.
     PaimonMetadataFilesCachePtr cache_ptr = nullptr;
     if (local_context->getSettingsRef()[Setting::use_paimon_metadata_files_cache])
         cache_ptr = local_context->getPaimonMetadataFilesCache();
@@ -366,15 +372,6 @@ void PaimonMetadata::update(const ContextPtr & /*local_context*/)
         new_state->snapshot_id);
 }
 
-void PaimonMetadata::drop(ContextPtr /*local_context*/)
-{
-    if (persistent_components.hasMetadataCache())
-    {
-        LOG_DEBUG(log, "Invalidating Paimon metadata cache entries with prefix: {}", persistent_components.table_cache_key_prefix);
-        persistent_components.metadata_cache->removeByPrefix(persistent_components.table_cache_key_prefix);
-    }
-}
-
 NamesAndTypesList PaimonMetadata::getTableSchema(ContextPtr /*local_context*/) const
 {
     auto state = getCurrentState();
@@ -459,7 +456,7 @@ ManifestListConstPtr PaimonMetadata::getManifestList(const String & manifest_lis
     if (manifest_list_path.empty())
         return std::make_shared<const std::vector<PaimonManifestFileMeta>>();
 
-    if (persistent_components.hasMetadataCache())
+    if (persistent_components.isMetadataCacheActive())
     {
         String cache_key = PaimonMetadataFilesCache::makeKey(persistent_components.table_cache_key_prefix, manifest_list_path);
         auto log_ptr = log;
@@ -483,7 +480,7 @@ ManifestConstPtr PaimonMetadata::getManifest(const String & manifest_path, Int64
     if (!schema)
         throw Exception(ErrorCodes::LOGICAL_ERROR, "Schema with id {} not found", schema_id);
 
-    if (persistent_components.hasMetadataCache())
+    if (persistent_components.isMetadataCacheActive())
     {
         String cache_key = PaimonMetadataFilesCache::makeKey(persistent_components.table_cache_key_prefix, manifest_path + ":" + toString(schema_id));
         auto log_ptr = log;
