@@ -24,8 +24,6 @@
 namespace DB
 {
 
-using namespace Paimon;
-
 class PaimonMetadata : public IDataLakeMetadata, private WithContext
 {
 public:
@@ -114,7 +112,7 @@ private:
     Strings collectDataFilesFromManifests(
         const std::vector<PaimonTableStatePtr> & snapshots,
         ManifestKind kind,
-        const std::optional<PartitionPruner> & partition_pruner,
+        const std::optional<Paimon::PartitionPruner> & partition_pruner,
         bool deduplicate,
         bool track_deletes) const;
 
@@ -156,19 +154,19 @@ private:
     /// Collect data files for incremental read (from committed snapshot to current)
     Strings collectIncrementalDataFiles(
         const PaimonTableStatePtr & state,
-        const std::optional<PartitionPruner> & partition_pruner,
+        const std::optional<Paimon::PartitionPruner> & partition_pruner,
         UInt64 max_consume_snapshots,
         std::optional<Int64> & last_consumed_snapshot_id) const;
 
     /// Collect data files for a specific snapshot delta (session-level targeted read)
     Strings collectDeltaFilesForSnapshot(
         const PaimonTableStatePtr & state,
-        const std::optional<PartitionPruner> & partition_pruner) const;
+        const std::optional<Paimon::PartitionPruner> & partition_pruner) const;
 
     /// Collect data files for full scan
     Strings collectFullScanDataFiles(
         const PaimonTableStatePtr & state,
-        const std::optional<PartitionPruner> & partition_pruner) const;
+        const std::optional<Paimon::PartitionPruner> & partition_pruner) const;
 
     /// Background refresh task entry
     void scheduleBackgroundRefresh();

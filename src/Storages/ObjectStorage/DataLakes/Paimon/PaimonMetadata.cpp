@@ -45,7 +45,6 @@ using namespace Paimon;
 namespace ErrorCodes
 {
 extern const int BAD_ARGUMENTS;
-extern const int FILE_DOESNT_EXIST;
 extern const int LOGICAL_ERROR;
 extern const int NO_ZOOKEEPER;
 extern const int REPLICA_IS_ALREADY_ACTIVE;
@@ -85,10 +84,16 @@ String buildPaimonCacheKeyPrefix(
     Int64 schema0_time_millis)
 {
     const String link_identity = configuration->getDataSourceDescription();
-    const String identity_material
-        = fmt::format("{}|{}|{}", link_identity, table_name, schema0_time_millis);
-    const auto key_prefix_hash = sipHash64(identity_material);
-    return fmt::format("{:016x}", key_prefix_hash);
+    /// Feed each component into SipHash with its length prefix to avoid
+    /// ambiguity when a component itself contains the delimiter character.
+    /// For example, link="a|b" + table="c" must differ from link="a" + table="b|c".
+    SipHash hash;
+    hash.update(link_identity.size());
+    hash.update(link_identity);
+    hash.update(table_name.size());
+    hash.update(table_name);
+    hash.update(schema0_time_millis);
+    return fmt::format("{:016x}", hash.get64());
 }
 }
 
@@ -194,23 +199,10 @@ DataLakeMetadataPtr PaimonMetadata::create(
     String table_cache_key_prefix;
     if (cache_ptr)
     {
-        Int64 schema0_time_millis = schema->time_millis;
-        try
-        {
-            auto schema0_info = table_client->getTableSchemaInfoById(0);
-            auto schema0_json = table_client->getTableSchemaJSON(schema0_info);
-            Paimon::getValueFromJSON(schema0_time_millis, schema0_json, "timeMillis");
-        }
-        catch (const Exception & e)
-        {
-            if (e.code() != ErrorCodes::FILE_DOESNT_EXIST)
-                throw;
-            LOG_WARNING(
-                log,
-                "schema-0 was not found for table path {}, fallback to latest schema timeMillis {} to build cache key prefix",
-                table_path,
-                schema0_time_millis);
-        }
+        auto schema0_info = table_client->getTableSchemaInfoById(0);
+        auto schema0_json = table_client->getTableSchemaJSON(schema0_info);
+        Int64 schema0_time_millis = 0;
+        Paimon::getValueFromJSON(schema0_time_millis, schema0_json, "timeMillis");
 
         const String table_name = configuration_ptr->getRawPath().path.empty()
             ? table_path
@@ -470,8 +462,8 @@ ManifestListConstPtr PaimonMetadata::getManifestList(const String & manifest_lis
     }
 
     LOG_TRACE(log, "Loading manifest list (no cache): {}", manifest_list_path);
-    return std::make_shared<const std::vector<PaimonManifestFileMeta>>(
-        table_client->getManifestMeta(manifest_list_path));
+    auto [manifest_list, _] = table_client->getManifestMeta(manifest_list_path);
+    return std::make_shared<const std::vector<PaimonManifestFileMeta>>(std::move(manifest_list));
 }
 
 ManifestConstPtr PaimonMetadata::getManifest(const String & manifest_path, Int64 schema_id) const
